@@ -2,7 +2,7 @@
   <div class="sql-parser">
     <div class="header">
       <h1>SQL 参数解析工具</h1>
-      <p>输入带参数的SQL语句，自动解析并替换为完整的SQL</p>
+      <p>使用 Ctrl+V 直接粘贴SQL，自动解析并格式化</p>
     </div>
     
     <div class="content">
@@ -13,8 +13,9 @@
             <button @click="parseSql" :disabled="loading" class="parse-btn">
               {{ loading ? '解析中...' : '解析 SQL' }}
             </button>
-            <button @click="clearInput" class="clear-btn">清空</button>
-            <button @click="loadExample" class="example-btn">示例</button>
+            <button @click="toggleHistory" class="history-btn">
+              历史记录 ({{ historyList.length }})
+            </button>
           </div>
         </div>
         <textarea
@@ -51,41 +52,49 @@
         </div>
       </div>
     </div>
-    
-    <div class="info-panel" v-if="parseInfo">
-      <div class="info-grid">
-        <div class="info-item">
-          <h4>参数信息</h4>
-          <div class="params-list">
-            <div v-for="(param, index) in parseInfo.parameters" :key="index" class="param-item">
-              <span class="param-index">{{ index + 1 }}</span>
-              <span class="param-value">{{ param.value }}</span>
-              <span class="param-type">{{ param.type }}</span>
+
+    <!-- 历史记录侧边栏 -->
+    <div v-if="showHistory" class="history-sidebar">
+      <div class="history-header">
+        <h3>历史记录</h3>
+        <button @click="toggleHistory" class="close-btn">✕</button>
+      </div>
+      <div class="history-content">
+        <div v-if="historyList.length === 0" class="history-empty">
+          暂无历史记录
+        </div>
+        <div v-else>
+          <div 
+            v-for="(item, index) in historyList" 
+            :key="index"
+            class="history-item"
+            @click="loadFromHistory(item)"
+          >
+            <div class="history-preview">
+              {{ item.sql.length > 100 ? item.sql.slice(0, 100) + '...' : item.sql }}
+            </div>
+            <div class="history-meta">
+              <span class="history-time">{{ formatTime(item.timestamp) }}</span>
+              <button @click.stop="removeFromHistory(index)" class="remove-btn">删除</button>
             </div>
           </div>
         </div>
-        <div class="info-item">
-          <h4>统计信息</h4>
-          <div class="stat-item">
-            <span>参数数量：</span>
-            <span>{{ parseInfo.paramCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span>占位符数量：</span>
-            <span>{{ parseInfo.placeholderCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span>SQL长度：</span>
-            <span>{{ parseInfo.sqlLength }}</span>
-          </div>
-        </div>
+      </div>
+      <div class="history-footer">
+        <button @click="clearHistory" :disabled="historyList.length === 0" class="clear-all-btn">
+          清空历史
+        </button>
       </div>
     </div>
+    
+    <!-- 历史记录遮罩 -->
+    <div v-if="showHistory" class="history-overlay" @click="toggleHistory"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 // 响应式数据
 const inputText = ref('')
@@ -100,6 +109,144 @@ const formattedSql = computed(() => {
   if (!parsedSql.value) return ''
   return isFormatted.value ? formatSqlString(parsedSql.value) : parsedSql.value
 })
+
+// 历史记录类型定义
+interface SqlHistoryItem {
+  sql: string
+  formatted_sql: string
+  timestamp: number
+  hash: string
+}
+
+const historyList = ref<SqlHistoryItem[]>([])
+const showHistory = ref(false)
+
+// 生成哈希
+function generateHash(sql: string): string {
+  // 使用简单的哈希算法
+  let hash = 0
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // 转换为32位整数
+  }
+  return Math.abs(hash).toString(36).slice(0, 16)
+}
+
+// 保存历史记录到文件
+async function saveHistoryToFile() {
+  try {
+    await invoke('save_sql_history', { history: historyList.value })
+    console.log('SQL历史记录已保存到文件')
+  } catch (err) {
+    console.error('保存SQL历史记录失败:', err)
+  }
+}
+
+// 从文件加载历史记录
+async function loadHistoryFromFile() {
+  try {
+    const history = await invoke<SqlHistoryItem[]>('load_sql_history')
+    historyList.value = history
+    console.log('已从文件加载SQL历史记录')
+  } catch (err) {
+    console.error('加载SQL历史记录失败:', err)
+  }
+}
+
+// 添加到历史记录
+function addToHistory(sql: string, formatted_sql: string) {
+  const hash = generateHash(sql)
+  
+  // 检查是否已存在相同的SQL
+  const existingIndex = historyList.value.findIndex(item => item.hash === hash)
+  
+  if (existingIndex !== -1) {
+    // 如果已存在，更新时间戳
+    historyList.value[existingIndex].timestamp = Date.now()
+    // 重新排序
+    historyList.value.sort((a, b) => b.timestamp - a.timestamp)
+    // 保存到文件
+    saveHistoryToFile()
+    return
+  }
+  
+  // 如果不存在，创建新记录
+  const historyItem: SqlHistoryItem = {
+    sql,
+    formatted_sql,
+    timestamp: Date.now(),
+    hash
+  }
+  
+  // 添加新记录
+  historyList.value.push(historyItem)
+  
+  // 按时间戳排序（最新在前）
+  historyList.value.sort((a, b) => b.timestamp - a.timestamp)
+  
+  // 最多保存20条
+  if (historyList.value.length > 20) {
+    historyList.value = historyList.value.slice(0, 20)
+  }
+  
+  // 保存到文件
+  saveHistoryToFile()
+}
+
+// 从历史记录加载
+function loadFromHistory(item: SqlHistoryItem) {
+  inputText.value = item.sql
+  parsedSql.value = item.formatted_sql
+  error.value = ''
+  showHistory.value = false
+  isFormatted.value = true
+}
+
+// 移除历史记录
+function removeFromHistory(index: number) {
+  historyList.value.splice(index, 1)
+  saveHistoryToFile()
+}
+
+// 清空历史记录
+function clearHistory() {
+  historyList.value = []
+  saveHistoryToFile()
+}
+
+// 切换历史记录显示
+function toggleHistory() {
+  showHistory.value = !showHistory.value
+}
+
+// 格式化时间
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const isCurrentYear = date.getFullYear() === now.getFullYear()
+  
+  if (isCurrentYear) {
+    // 当年的记录只显示月日时分秒
+    return date.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } else {
+    // 不同年份的记录显示完整日期时分秒
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+}
 
 // JavaScript版本的参数解析逻辑
 const parseParameters = (arrStr: string): Array<{value: any, type: string}> => {
@@ -189,7 +336,6 @@ const parseSql = async () => {
   loading.value = true
   error.value = ''
   parsedSql.value = ''
-  parseInfo.value = null
   
   try {
     // 模拟异步处理
@@ -215,15 +361,13 @@ const parseSql = async () => {
     // 替换参数
     const filledSql = replaceParameters(sqlPart, parameters)
     
-    // 统计占位符数量
-    const placeholderCount = (sqlPart.match(/\?/g) || []).length
-    
     parsedSql.value = filledSql
-    parseInfo.value = {
-      parameters,
-      paramCount: parameters.length,
-      placeholderCount,
-      sqlLength: filledSql.length
+    
+    // 添加到历史记录
+    if (isFormatted.value) {
+      addToHistory(inputText.value, formattedSql.value)
+    } else {
+      addToHistory(inputText.value, filledSql)
     }
     
   } catch (err) {
@@ -231,15 +375,6 @@ const parseSql = async () => {
   } finally {
     loading.value = false
   }
-}
-
-// 清空输入
-const clearInput = () => {
-  inputText.value = ''
-  parsedSql.value = ''
-  error.value = ''
-  parseInfo.value = null
-  isFormatted.value = false
 }
 
 // 重置错误
@@ -292,18 +427,56 @@ const formatSqlString = (sql: string): string => {
   return formatted.replace(/^\n/, '') // 移除开头的换行
 }
 
-// 加载示例
-const loadExample = () => {
-  inputText.value = `SELECT u.id, u.name, u.email, u.created_at 
-FROM users u 
-WHERE u.status = ? 
-  AND u.created_at >= ? 
-  AND u.department_id = ? 
-  AND u.name LIKE ?
-ORDER BY u.created_at DESC
-LIMIT ?
-db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
+// 自动获取剪贴板内容并处理
+const autoProcessClipboard = async () => {
+  try {
+    const clipboardText = await invoke<string>('get_clipboard')
+    if (!clipboardText || !clipboardText.trim()) return
+    
+    // 设置输入内容
+    inputText.value = clipboardText
+    // 自动解析
+    await parseSql()
+    // 自动格式化
+    isFormatted.value = true
+    // 自动复制格式化后的结果
+    if (parsedSql.value) {
+      await navigator.clipboard.writeText(formattedSql.value)
+    }
+  } catch (err) {
+    console.error('处理剪贴板内容失败:', err)
+  }
 }
+
+// 键盘事件处理
+const handleKeydown = async (event: KeyboardEvent) => {
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
+  
+  // Command+V (Mac) 或 Ctrl+V (Windows/Linux)
+  if (isModifierPressed && event.key.toLowerCase() === 'v') {
+    event.preventDefault()
+    event.stopPropagation()
+    await autoProcessClipboard()
+  }
+}
+
+// 生命周期钩子
+onMounted(async () => {
+  // 从文件加载历史记录
+  await loadHistoryFromFile()
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onActivated(async () => {
+  // 组件激活时自动处理剪贴板内容
+  await autoProcessClipboard()
+})
+
+// 组件卸载时移除事件监听器
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <style scoped>
@@ -393,10 +566,8 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   transform: none;
 }
 
-.clear-btn,
 .copy-btn,
-.format-btn,
-.example-btn {
+.format-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -407,10 +578,8 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   transition: all 0.3s ease;
 }
 
-.clear-btn:hover,
 .copy-btn:hover:not(:disabled),
-.format-btn:hover:not(:disabled),
-.example-btn:hover {
+.format-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -474,106 +643,11 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   font-size: 13px;
 }
 
-.info-panel {
-  margin-top: 20px;
-  padding: 20px;
-  background: #252526;
-  border-radius: 8px;
-  border-left: 4px solid #42b983;
-  border: 1px solid #3c3c3c;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 30px;
-}
-
-.info-item h4 {
-  margin: 0 0 15px 0;
-  color: #ffffff;
-}
-
-.params-list {
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.param-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.param-item:last-child {
-  border-bottom: none;
-}
-
-.param-index {
-  background: #42b983;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.param-value {
-  flex: 1;
-  font-family: 'Courier New', monospace;
-  background: #2d2d30;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 13px;
-  color: #d4d4d4;
-}
-
-.param-type {
-  background: #6c757d;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: bold;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.stat-item:last-child {
-  border-bottom: none;
-}
-
-.stat-item span:first-child {
-  font-weight: 500;
-  color: #a0a0a0;
-}
-
-.stat-item span:last-child {
-  color: #ffffff;
-  font-weight: 600;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .content {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
-  }
-  
-  .info-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
   }
   
   .sql-parser {
@@ -590,5 +664,163 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
     align-items: flex-start;
     gap: 10px;
   }
+}
+
+.history-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.history-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.history-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: #252526;
+  border-left: 1px solid #3c3c3c;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+.history-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #2d2d30;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.history-header h3 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #cccccc;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.close-btn:hover {
+  color: #ffffff;
+}
+
+.history-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.history-empty {
+  color: #6a6a6a;
+  text-align: center;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.history-item {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.history-item:hover {
+  border-color: #42b983;
+  transform: translateX(-2px);
+}
+
+.history-preview {
+  padding: 15px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.history-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 15px;
+  background: #2d2d30;
+  border-top: 1px solid #3c3c3c;
+}
+
+.history-time {
+  color: #a0a0a0;
+  font-size: 12px;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #f48771;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+
+.remove-btn:hover {
+  background: rgba(244, 135, 113, 0.2);
+}
+
+.history-footer {
+  padding: 15px;
+  background: #2d2d30;
+  border-top: 1px solid #3c3c3c;
+}
+
+.clear-all-btn {
+  width: 100%;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.clear-all-btn:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.clear-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style> 
