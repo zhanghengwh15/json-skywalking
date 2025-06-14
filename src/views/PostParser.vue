@@ -916,9 +916,6 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
 </script>
-
-<style scoped>
-.post-parser {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
