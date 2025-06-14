@@ -14,6 +14,10 @@
               {{ loading ? '解析中...' : '解析 JSON' }}
             </button>
             <button @click="clearInput" class="clear-btn">清空</button>
+            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (⌘⇧G)'">
+              获取剪贴板
+              <span class="shortcut-hint">⌘⇧G</span>
+            </button>
           </div>
         </div>
         <textarea
@@ -22,6 +26,9 @@
           class="json-input"
           @input="resetError"
         ></textarea>
+        <div v-if="clipboardStatus" class="clipboard-status" :class="clipboardStatus.type">
+          {{ clipboardStatus.message }}
+        </div>
       </div>
       
       <div class="output-section">
@@ -65,12 +72,21 @@
           <span>{{ jsonStats.length }}</span>
         </div>
       </div>
+      
+      <div class="keyboard-shortcuts">
+        <h4>快捷键</h4>
+        <div class="shortcut-item">
+          <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd>
+          <span>获取剪贴板</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 // 响应式数据
 const inputJson = ref('')
@@ -78,6 +94,7 @@ const parsedJson = ref<any>(null)
 const error = ref('')
 const loading = ref(false)
 const isCompact = ref(false)
+const clipboardStatus = ref<{type: 'success' | 'error' | 'info', message: string} | null>(null)
 
 // JSON统计信息
 const jsonStats = computed(() => {
@@ -115,6 +132,86 @@ const highlightedJson = computed(() => {
   return syntaxHighlight(jsonString)
 })
 
+// 检查字符串是否为有效JSON
+const isValidJson = (str: string): boolean => {
+  try {
+    JSON.parse(str)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// 键盘事件处理器
+const handleKeydown = (event: KeyboardEvent) => {
+  // 检测 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
+  
+  if (isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'g') {
+    event.preventDefault()
+    event.stopPropagation()
+    getClipboardContent()
+  }
+}
+
+// 获取剪贴板内容
+const getClipboardContent = async () => {
+  try {
+    const clipboardText = await invoke<string>('get_clipboard')
+    
+    if (!clipboardText || !clipboardText.trim()) {
+      showClipboardStatus('info', '剪贴板为空')
+      return
+    }
+    
+    // 检查是否为有效JSON
+    if (isValidJson(clipboardText)) {
+      inputJson.value = clipboardText
+      showClipboardStatus('success', '检测到JSON格式，已自动填入 (快捷键生效)')
+      // 自动解析JSON
+      setTimeout(() => {
+        parseJson()
+      }, 100)
+    } else {
+      showClipboardStatus('error', '剪贴板内容不是有效的JSON格式')
+    }
+  } catch (err) {
+    console.error('获取剪贴板失败:', err)
+    showClipboardStatus('error', '获取剪贴板失败: ' + (err as Error).message)
+  }
+}
+
+// 显示剪贴板状态
+const showClipboardStatus = (type: 'success' | 'error' | 'info', message: string) => {
+  clipboardStatus.value = { type, message }
+  setTimeout(() => {
+    clipboardStatus.value = null
+  }, 3000)
+}
+
+// 自动检查剪贴板（页面加载时）
+const autoCheckClipboard = async () => {
+  try {
+    const clipboardText = await invoke<string>('get_clipboard')
+    
+    if (clipboardText && clipboardText.trim() && isValidJson(clipboardText)) {
+      // 如果输入框为空或只有示例数据，则自动填入
+      if (!inputJson.value.trim() || inputJson.value === getExampleJson()) {
+        inputJson.value = clipboardText
+        showClipboardStatus('success', '自动检测到剪贴板中的JSON格式数据')
+        // 自动解析JSON
+        setTimeout(() => {
+          parseJson()
+        }, 100)
+      }
+    }
+  } catch (err) {
+    // 静默处理错误，不影响正常使用
+    console.log('自动检查剪贴板失败:', err)
+  }
+}
+
 // 解析JSON
 const parseJson = async () => {
   if (!inputJson.value.trim()) {
@@ -144,6 +241,7 @@ const clearInput = () => {
   inputJson.value = ''
   parsedJson.value = null
   error.value = ''
+  clipboardStatus.value = null
 }
 
 // 重置错误
@@ -161,8 +259,7 @@ const copyToClipboard = async () => {
   
   try {
     await navigator.clipboard.writeText(jsonString)
-    // 这里可以添加提示信息
-    alert('已复制到剪贴板！')
+    showClipboardStatus('success', '已复制到剪贴板！')
   } catch (err) {
     // 降级方案
     const textArea = document.createElement('textarea')
@@ -171,7 +268,7 @@ const copyToClipboard = async () => {
     textArea.select()
     document.execCommand('copy')
     document.body.removeChild(textArea)
-    alert('已复制到剪贴板！')
+    showClipboardStatus('success', '已复制到剪贴板！')
   }
 }
 
@@ -201,9 +298,9 @@ const syntaxHighlight = (json: string): string => {
   })
 }
 
-// 示例JSON数据
-const loadExample = () => {
-  inputJson.value = `{
+// 获取示例JSON数据
+const getExampleJson = (): string => {
+  return `{
   "name": "张三",
   "age": 30,
   "isStudent": false,
@@ -221,8 +318,38 @@ const loadExample = () => {
 }`
 }
 
-// 页面加载时加载示例
-loadExample()
+// 示例JSON数据
+const loadExample = () => {
+  inputJson.value = getExampleJson()
+}
+
+// 生命周期钩子
+onMounted(() => {
+  // 页面加载时自动检查剪贴板
+  autoCheckClipboard()
+  // 添加键盘事件监听器
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// 组件激活时（用于keep-alive情况）
+onActivated(() => {
+  // 组件激活时也检查剪贴板
+  autoCheckClipboard()
+  // 确保键盘事件监听器存在
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// 组件卸载时移除事件监听器
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
+
+// 如果没有剪贴板内容，则加载示例
+setTimeout(() => {
+  if (!inputJson.value.trim()) {
+    loadExample()
+  }
+}, 200)
 </script>
 
 <style scoped>
@@ -310,7 +437,8 @@ loadExample()
 
 .clear-btn,
 .copy-btn,
-.compact-btn {
+.compact-btn,
+.clipboard-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -319,12 +447,29 @@ loadExample()
   cursor: pointer;
   font-size: 14px;
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .clear-btn:hover,
 .copy-btn:hover:not(:disabled),
-.compact-btn:hover:not(:disabled) {
+.compact-btn:hover:not(:disabled),
+.clipboard-btn:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.clipboard-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shortcut-hint {
+  font-size: 11px;
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
 }
 
 .json-input {
@@ -380,15 +525,51 @@ loadExample()
   font-size: 13px;
 }
 
+.clipboard-status {
+  padding: 10px 20px;
+  font-size: 14px;
+  border-top: 1px solid #ddd;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+.clipboard-status.success {
+  background: #d4edda;
+  color: #155724;
+  border-left: 4px solid #28a745;
+}
+
+.clipboard-status.error {
+  background: #f8d7da;
+  color: #721c24;
+  border-left: 4px solid #dc3545;
+}
+
+.clipboard-status.info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border-left: 4px solid #17a2b8;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-10px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
 .info-panel {
   margin-top: 20px;
   padding: 15px;
   background: #f0f2f5;
   border-radius: 8px;
   border-left: 4px solid #42b983;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
 }
 
-.stats h4 {
+.stats h4,
+.keyboard-shortcuts h4 {
   margin: 0 0 15px 0;
   color: #2c3e50;
 }
@@ -412,6 +593,35 @@ loadExample()
 .stat-item span:last-child {
   color: #2c3e50;
   font-weight: 600;
+}
+
+.keyboard-shortcuts {
+  min-width: 200px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.shortcut-item kbd {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #333;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  font-family: monospace;
+}
+
+.shortcut-item span {
+  color: #2c3e50;
+  font-weight: 500;
 }
 
 /* JSON语法高亮样式 */
@@ -458,6 +668,14 @@ loadExample()
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+  }
+  
+  .info-panel {
+    grid-template-columns: 1fr;
+  }
+  
+  .shortcut-hint {
+    display: none;
   }
 }
 </style> 

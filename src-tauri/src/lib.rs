@@ -1,7 +1,8 @@
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 use tauri_plugin_store::StoreExt;
+use tauri_plugin_global_shortcut;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParseRecord {
@@ -30,6 +31,30 @@ fn get_clipboard() -> Result<String, String> {
             }
         },
         Err(e) => Err(format!("Failed to create clipboard: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn global_clipboard_shortcut(app: tauri::AppHandle) -> Result<String, String> {
+    // 先尝试获取剪贴板内容
+    let clipboard_text = match get_clipboard() {
+        Ok(text) => text,
+        Err(e) => return Err(e),
+    };
+    
+    // 检查是否为有效JSON
+    if let Ok(_) = serde_json::from_str::<serde_json::Value>(&clipboard_text) {
+        // 发送事件到前端，通知检测到JSON格式
+        app.emit("global-clipboard-json", &clipboard_text)
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+        
+        Ok(clipboard_text)
+    } else {
+        // 发送事件到前端，通知非JSON格式
+        app.emit("global-clipboard-not-json", &clipboard_text)
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+        
+        Err("剪贴板内容不是有效的JSON格式".to_string())
     }
 }
 
@@ -117,9 +142,35 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .setup(|app| {
+            // 注册全局快捷键
+            let handle = app.handle().clone();
+            
+            // 注册 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
+            #[cfg(target_os = "macos")]
+            let shortcut = "CommandOrControl+Shift+G";
+            #[cfg(not(target_os = "macos"))]
+            let shortcut = "Ctrl+Shift+G";
+            
+            app.global_shortcut().register(shortcut, move || {
+                let handle_clone = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = global_clipboard_shortcut(handle_clone).await {
+                        eprintln!("Global shortcut error: {}", e);
+                    }
+                });
+            })
+            .map_err(|e| format!("Failed to register global shortcut: {}", e))?;
+            
+            println!("Global shortcut registered: {}", shortcut);
+            
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet, 
             get_clipboard, 
+            global_clipboard_shortcut,
             save_parse_record, 
             get_parse_records, 
             delete_parse_record, 
