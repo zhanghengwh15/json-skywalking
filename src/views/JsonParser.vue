@@ -28,11 +28,14 @@
               :key-name="'root'" 
               :is-root="true"
               :level="0"
+              :selected-path="selectedKeyPath"
+              :current-path="[]"
+              @select="onSelectKey"
             />
           </div>
           <div v-else class="placeholder">
             <div class="placeholder-icon">📋</div>
-            <p>使用 <kbd>⌘⇧G</kbd> 从剪贴板加载JSON数据</p>
+            <p>使用 <kbd>⌘⇧G</kbd> 或 <kbd>⌘V</kbd> 从剪贴板加载JSON数据</p>
             <p class="placeholder-hint">或点击上方的"获取剪贴板"按钮</p>
           </div>
         </div>
@@ -43,13 +46,13 @@
       
       <div class="output-section">
         <div class="section-header">
-          <h3>格式化结果</h3>
+          <h3>值内容</h3>
           <div class="actions">
-            <button @click="copyToClipboard" :disabled="!parsedJson" class="copy-btn">
-              复制结果
+            <button @click="copySelectedValue" :disabled="!parsedJson" class="copy-btn">
+              复制值
             </button>
-            <button @click="compactJson" :disabled="!parsedJson" class="compact-btn">
-              压缩格式
+            <button @click="toggleHistory" class="history-btn">
+              历史记录 ({{ historyList.length }})
             </button>
           </div>
         </div>
@@ -58,42 +61,50 @@
             <h4>解析错误：</h4>
             <p>{{ error }}</p>
           </div>
-          <div v-else-if="parsedJson" class="json-display" v-html="highlightedJson"></div>
-          <div v-else class="placeholder">
+          <div v-else-if="!parsedJson" class="placeholder">
             解析后的JSON将在这里显示...
           </div>
+          <div v-else class="json-display" v-html="highlightedDisplay"></div>
         </div>
       </div>
     </div>
     
-    <div class="info-panel">
-      <div class="stats" v-if="jsonStats">
-        <h4>JSON 信息</h4>
-        <div class="stat-item">
-          <span>类型：</span>
-          <span>{{ jsonStats.type }}</span>
+    <!-- 历史记录侧边栏 -->
+    <div v-if="showHistory" class="history-sidebar">
+      <div class="history-header">
+        <h3>历史记录</h3>
+        <button @click="toggleHistory" class="close-btn">✕</button>
+      </div>
+      <div class="history-content">
+        <div v-if="historyList.length === 0" class="history-empty">
+          暂无历史记录
         </div>
-        <div class="stat-item">
-          <span>键的数量：</span>
-          <span>{{ jsonStats.keyCount }}</span>
-        </div>
-        <div class="stat-item">
-          <span>字符长度：</span>
-          <span>{{ jsonStats.length }}</span>
+        <div v-else>
+          <div 
+            v-for="(item, index) in historyList" 
+            :key="index"
+            class="history-item"
+            @click="loadFromHistory(item)"
+          >
+            <div class="history-preview">
+              {{ getHistoryPreview(item) }}
+            </div>
+            <div class="history-meta">
+              <span class="history-time">{{ formatTime(item.timestamp) }}</span>
+              <button @click.stop="removeFromHistory(index)" class="remove-btn">删除</button>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <div class="keyboard-shortcuts">
-        <h4>快捷键</h4>
-        <div class="shortcut-item">
-          <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd>
-          <span>全局获取剪贴板 🌍</span>
-        </div>
-        <div class="shortcut-note">
-          💡 即使软件在后台运行也可以使用
-        </div>
+      <div class="history-footer">
+        <button @click="clearHistory" :disabled="historyList.length === 0" class="clear-all-btn">
+          清空历史
+        </button>
       </div>
     </div>
+    
+    <!-- 历史记录遮罩 -->
+    <div v-if="showHistory" class="history-overlay" @click="toggleHistory"></div>
   </div>
 </template>
 
@@ -102,28 +113,24 @@ import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h 
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
+// 递归查找value
+function getValueByPath(obj: any, path: (string|number)[]): any {
+  return path.reduce((acc, key) => (acc !== undefined && acc !== null) ? acc[key] : undefined, obj)
+}
+
 // JSON树节点组件
 const JsonTreeNode = defineComponent({
   name: 'JsonTreeNode',
   props: {
-    data: {
-      type: [Object, Array, String, Number, Boolean],
-      default: null
-    },
-    keyName: {
-      type: String,
-      default: ''
-    },
-    isRoot: {
-      type: Boolean,
-      default: false
-    },
-    level: {
-      type: Number,
-      default: 0
-    }
+    data: { type: [Object, Array, String, Number, Boolean], default: null },
+    keyName: { type: String, default: '' },
+    isRoot: { type: Boolean, default: false },
+    level: { type: Number, default: 0 },
+    selectedPath: { type: Array, default: () => [] },
+    currentPath: { type: Array, default: () => [] }
   },
-  setup(props) {
+  emits: ['select'],
+  setup(props, { emit }) {
     const isExpanded = ref(props.level < 2) // 默认展开前两层
     
     const toggleExpanded = () => {
@@ -144,20 +151,25 @@ const JsonTreeNode = defineComponent({
       return String(value)
     }
     
-    const isExpandable = computed(() => {
-      return props.data !== null && (Array.isArray(props.data) || typeof props.data === 'object')
-    })
+    const isExpandable = computed(() => props.data !== null && (Array.isArray(props.data) || typeof props.data === 'object'))
+    const isSelected = computed(() => JSON.stringify(props.selectedPath) === JSON.stringify(props.currentPath))
+    
+    const handleSelect = (e: MouseEvent) => {
+      e.stopPropagation()
+      emit('select', props.currentPath.slice())
+    }
     
     return () => {
-      const { data, keyName, isRoot, level } = props
+      const { data, keyName, isRoot, level, selectedPath, currentPath } = props
       const valueType = getValueType(data)
-      const indent = level * 20
+      const indent = level * 16
       
       if (!isExpandable.value) {
         // 叶子节点
         return h('div', {
-          class: 'tree-node leaf-node',
-          style: { paddingLeft: `${indent}px` }
+          class: ['tree-node', 'leaf-node', isSelected.value ? 'selected' : ''],
+          style: { paddingLeft: `${indent}px` },
+          onClick: handleSelect
         }, [
           h('span', { class: 'node-key' }, keyName + ': '),
           h('span', { 
@@ -172,12 +184,13 @@ const JsonTreeNode = defineComponent({
       // 节点头部
       children.push(
         h('div', {
-          class: 'tree-node expandable-node',
+          class: ['tree-node', 'expandable-node', isSelected.value ? 'selected' : ''],
           style: { paddingLeft: `${indent}px` },
-          onClick: toggleExpanded
+          onClick: handleSelect
         }, [
           h('span', { 
-            class: `expand-icon ${isExpanded.value ? 'expanded' : ''}` 
+            class: `expand-icon ${isExpanded.value ? 'expanded' : ''}`,
+            onClick: (e: MouseEvent) => { e.stopPropagation(); toggleExpanded() }
           }, isExpanded.value ? '▼' : '▶'),
           !isRoot && h('span', { class: 'node-key' }, keyName + ': '),
           h('span', { 
@@ -197,7 +210,10 @@ const JsonTreeNode = defineComponent({
                 key: index,
                 data: item,
                 keyName: `[${index}]`,
-                level: level + 1
+                level: level + 1,
+                selectedPath,
+                currentPath: [...currentPath, index],
+                onSelect: emit.bind(null, 'select')
               })
             )
           })
@@ -208,7 +224,10 @@ const JsonTreeNode = defineComponent({
                 key: key,
                 data: value,
                 keyName: key,
-                level: level + 1
+                level: level + 1,
+                selectedPath,
+                currentPath: [...currentPath, key],
+                onSelect: emit.bind(null, 'select')
               })
             )
           })
@@ -224,12 +243,125 @@ const JsonTreeNode = defineComponent({
   }
 })
 
-// 响应式数据
 const inputJson = ref('')
 const parsedJson = ref<any>(null)
 const error = ref('')
 const isCompact = ref(false)
 const clipboardStatus = ref<{type: 'success' | 'error' | 'info', message: string} | null>(null)
+const selectedKeyPath = ref<(string|number)[]>([])
+const showHistory = ref(false)
+
+// 历史记录类型定义
+interface HistoryItem {
+  data: any
+  timestamp: number
+  hash: string
+}
+
+const historyList = ref<HistoryItem[]>([])
+
+const selectedValue = computed(() => {
+  if (!parsedJson.value || !selectedKeyPath.value.length) return undefined
+  return getValueByPath(parsedJson.value, selectedKeyPath.value)
+})
+
+// 显示的值：如果有选中的key则显示选中的值，否则显示完整JSON
+const displayValue = computed(() => {
+  if (selectedValue.value !== undefined) {
+    return typeof selectedValue.value === 'object' 
+      ? JSON.stringify(selectedValue.value, null, 2)
+      : String(selectedValue.value)
+  }
+  return parsedJson.value ? JSON.stringify(parsedJson.value, null, 2) : ''
+})
+
+// 高亮显示的内容
+const highlightedDisplay = computed(() => {
+  if (selectedValue.value !== undefined) {
+    if (typeof selectedValue.value === 'object') {
+      return syntaxHighlight(JSON.stringify(selectedValue.value, null, 2))
+    }
+    return syntaxHighlight(JSON.stringify(selectedValue.value))
+  }
+  return parsedJson.value ? syntaxHighlight(JSON.stringify(parsedJson.value, null, 2)) : ''
+})
+
+function onSelectKey(path: (string|number)[]) {
+  selectedKeyPath.value = path
+}
+
+async function copySelectedValue() {
+  if (!parsedJson.value) return
+  let val = displayValue.value
+  try {
+    await navigator.clipboard.writeText(val)
+    showClipboardStatus('success', '已复制到剪贴板！')
+  } catch (err) {
+    showClipboardStatus('error', '复制失败')
+  }
+}
+
+// 历史记录相关函数
+function generateHash(data: any): string {
+  return btoa(JSON.stringify(data)).slice(0, 16)
+}
+
+function addToHistory(data: any) {
+  const hash = generateHash(data)
+  // 检查是否已存在相同的JSON
+  if (historyList.value.some(item => item.hash === hash)) {
+    return
+  }
+  
+  const historyItem: HistoryItem = {
+    data,
+    timestamp: Date.now(),
+    hash
+  }
+  
+  // 添加到历史记录开头，最多保存20条
+  historyList.value.unshift(historyItem)
+  if (historyList.value.length > 20) {
+    historyList.value = historyList.value.slice(0, 20)
+  }
+}
+
+function toggleHistory() {
+  showHistory.value = !showHistory.value
+}
+
+function loadFromHistory(item: HistoryItem) {
+  parsedJson.value = item.data
+  inputJson.value = JSON.stringify(item.data, null, 2)
+  selectedKeyPath.value = []
+  error.value = ''
+  showHistory.value = false
+  showClipboardStatus('success', '已加载历史记录')
+}
+
+function removeFromHistory(index: number) {
+  historyList.value.splice(index, 1)
+}
+
+function clearHistory() {
+  historyList.value = []
+  showClipboardStatus('info', '历史记录已清空')
+}
+
+function getHistoryPreview(item: HistoryItem): string {
+  const str = JSON.stringify(item.data)
+  return str.length > 100 ? str.slice(0, 100) + '...' : str
+}
+
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
 // JSON统计信息
 const jsonStats = computed(() => {
@@ -287,6 +419,7 @@ const setupGlobalShortcutListeners = async () => {
         parsedJson.value = JSON.parse(clipboardText)
         inputJson.value = clipboardText
         error.value = ''
+        addToHistory(parsedJson.value)
         showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动解析')
       } catch (err) {
         error.value = err instanceof Error ? err.message : '无效的JSON格式'
@@ -309,7 +442,9 @@ const setupGlobalShortcutListeners = async () => {
 // 获取剪贴板内容并自动解析
 const getClipboardContent = async () => {
   try {
+    console.log('开始获取剪贴板内容...')
     const clipboardText = await invoke<string>('get_clipboard')
+    console.log('剪贴板内容:', clipboardText)
     
     if (!clipboardText || !clipboardText.trim()) {
       showClipboardStatus('info', '剪贴板为空')
@@ -319,9 +454,11 @@ const getClipboardContent = async () => {
     // 检查是否为有效JSON并直接解析
     if (isValidJson(clipboardText)) {
       try {
-        parsedJson.value = JSON.parse(clipboardText)
+        const parsed = JSON.parse(clipboardText)
+        parsedJson.value = parsed
         inputJson.value = clipboardText
         error.value = ''
+        addToHistory(parsed)
         showClipboardStatus('success', '检测到JSON格式，已自动解析')
       } catch (err) {
         error.value = err instanceof Error ? err.message : '无效的JSON格式'
@@ -332,8 +469,9 @@ const getClipboardContent = async () => {
       showClipboardStatus('error', '剪贴板内容不是有效的JSON格式')
     }
   } catch (err) {
-    console.error('获取剪贴板失败:', err)
-    showClipboardStatus('error', '获取剪贴板失败: ' + (err as Error).message)
+    console.error('获取剪贴板失败详细信息:', err)
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    showClipboardStatus('error', '获取剪贴板失败: ' + errorMessage)
   }
 }
 
@@ -355,6 +493,7 @@ const autoCheckClipboard = async () => {
         parsedJson.value = JSON.parse(clipboardText)
         inputJson.value = clipboardText
         error.value = ''
+        addToHistory(parsedJson.value)
         showClipboardStatus('success', '自动检测到剪贴板中的JSON格式数据')
       } catch (err) {
         // 静默处理错误
@@ -365,34 +504,6 @@ const autoCheckClipboard = async () => {
     // 静默处理错误，不影响正常使用
     console.log('自动检查剪贴板失败:', err)
   }
-}
-
-// 复制到剪贴板
-const copyToClipboard = async () => {
-  if (!parsedJson.value) return
-  
-  const jsonString = isCompact.value 
-    ? JSON.stringify(parsedJson.value)
-    : JSON.stringify(parsedJson.value, null, 2)
-  
-  try {
-    await navigator.clipboard.writeText(jsonString)
-    showClipboardStatus('success', '已复制到剪贴板！')
-  } catch (err) {
-    // 降级方案
-    const textArea = document.createElement('textarea')
-    textArea.value = jsonString
-    document.body.appendChild(textArea)
-    textArea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textArea)
-    showClipboardStatus('success', '已复制到剪贴板！')
-  }
-}
-
-// 压缩JSON格式
-const compactJson = () => {
-  isCompact.value = !isCompact.value
 }
 
 // JSON语法高亮
@@ -418,14 +529,33 @@ const syntaxHighlight = (json: string): string => {
 
 // 键盘事件处理器（本地快捷键作为备用）
 const handleKeydown = (event: KeyboardEvent) => {
-  // 检测 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
   const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
   
+  // Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux) - 全局快捷键备用
   if (isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'g') {
     event.preventDefault()
     event.stopPropagation()
     getClipboardContent()
+    return
+  }
+  
+  // Command+V (Mac) 或 Ctrl+V (Windows/Linux) - 传统粘贴快捷键
+  if (isModifierPressed && event.key.toLowerCase() === 'v') {
+    // 检查当前焦点是否在输入框或文本区域
+    const activeElement = document.activeElement as HTMLElement
+    const isInputFocused = activeElement && (
+      activeElement.tagName === 'INPUT' || 
+      activeElement.tagName === 'TEXTAREA' || 
+      (activeElement as any).contentEditable === 'true'
+    )
+    
+    // 如果没有焦点在输入框上，则拦截粘贴事件并处理JSON
+    if (!isInputFocused) {
+      event.preventDefault()
+      event.stopPropagation()
+      getClipboardContent()
+    }
   }
 }
 
@@ -522,7 +652,8 @@ onUnmounted(() => {
 
 .copy-btn,
 .compact-btn,
-.clipboard-btn {
+.clipboard-btn,
+.history-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -536,7 +667,8 @@ onUnmounted(() => {
 
 .copy-btn:hover:not(:disabled),
 .compact-btn:hover:not(:disabled),
-.clipboard-btn:hover {
+.clipboard-btn:hover,
+.history-btn:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -580,32 +712,43 @@ onUnmounted(() => {
 
 .json-tree-container {
   flex: 1;
-  padding: 20px;
+  padding: 8px 12px;
   background: #1e1e1e;
   overflow: auto;
-  color: #d4d4d4;
+  color: #cccccc;
 }
 
 .json-tree {
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.6;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #cccccc;
 }
 
 .tree-node {
   display: flex;
   align-items: center;
-  padding: 2px 0;
+  padding: 1px 4px;
   cursor: pointer;
   user-select: none;
+  color: #cccccc;
+  min-height: 22px;
+  border-radius: 3px;
+  margin: 1px 0;
+  transition: background-color 0.1s ease;
 }
 
 .tree-node.leaf-node {
-  cursor: default;
+  cursor: pointer;
 }
 
-.tree-node.expandable-node:hover {
-  background: rgba(255, 255, 255, 0.05);
+.tree-node.selected {
+  background: #094771;
+  color: #ffffff;
+}
+
+.tree-node:hover:not(.selected) {
+  background: #2a2d2e;
 }
 
 .expand-icon {
@@ -614,24 +757,26 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
+  margin-right: 2px;
   color: #cccccc;
-  font-size: 12px;
-  transition: transform 0.2s ease;
+  font-size: 10px;
+  transition: transform 0.1s ease;
+  cursor: pointer;
 }
 
 .expand-icon.expanded {
-  transform: rotate(0deg);
+  transform: rotate(90deg);
 }
 
 .node-key {
   color: #9cdcfe;
-  font-weight: bold;
+  font-weight: 400;
   margin-right: 4px;
 }
 
 .node-value {
-  margin-left: 4px;
+  margin-left: 2px;
+  font-weight: 400;
 }
 
 .node-value.string {
@@ -644,22 +789,27 @@ onUnmounted(() => {
 
 .node-value.boolean {
   color: #569cd6;
-  font-weight: bold;
+  font-weight: 400;
 }
 
 .node-value.null {
   color: #569cd6;
-  font-weight: bold;
+  font-weight: 400;
 }
 
 .node-value.object,
 .node-value.array {
   color: #cccccc;
-  font-style: italic;
+  font-style: normal;
+  opacity: 0.8;
 }
 
 .tree-children {
-  margin-left: 16px;
+  margin-left: 12px;
+}
+
+.tree-node-container {
+  position: relative;
 }
 
 .json-output {
@@ -862,6 +1012,148 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
+/* 历史记录样式 */
+.history-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.history-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: #252526;
+  border-left: 1px solid #3c3c3c;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #3c3c3c;
+  background: #2d2d30;
+}
+
+.history-header h3 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #cccccc;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.history-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.history-empty {
+  text-align: center;
+  color: #6a6a6a;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.history-item {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: #2a2a2a;
+  border-color: #4a4a4a;
+}
+
+.history-preview {
+  color: #d4d4d4;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.history-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-time {
+  color: #a0a0a0;
+  font-size: 11px;
+}
+
+.remove-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.remove-btn:hover {
+  background: #c82333;
+}
+
+.history-footer {
+  padding: 20px;
+  border-top: 1px solid #3c3c3c;
+  background: #2d2d30;
+}
+
+.clear-all-btn {
+  width: 100%;
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clear-all-btn:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.clear-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .content {
@@ -884,16 +1176,16 @@ onUnmounted(() => {
     gap: 10px;
   }
   
-  .info-panel {
-    grid-template-columns: 1fr;
-  }
-  
   .shortcut-hint {
     display: none;
   }
   
   .global-indicator {
     display: none;
+  }
+  
+  .history-sidebar {
+    width: 100%;
   }
 }
 </style> 
