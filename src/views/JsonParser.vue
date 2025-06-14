@@ -75,7 +75,7 @@
       <div class="history-header">
         <h3>历史记录</h3>
         <button @click="toggleHistory" class="close-btn">✕</button>
-      </div>
+        </div>
       <div class="history-content">
         <div v-if="historyList.length === 0" class="history-empty">
           暂无历史记录
@@ -89,19 +89,19 @@
           >
             <div class="history-preview">
               {{ getHistoryPreview(item) }}
-            </div>
+        </div>
             <div class="history-meta">
               <span class="history-time">{{ formatTime(item.timestamp) }}</span>
               <button @click.stop="removeFromHistory(index)" class="remove-btn">删除</button>
-            </div>
-          </div>
+      </div>
+        </div>
         </div>
       </div>
       <div class="history-footer">
         <button @click="clearHistory" :disabled="historyList.length === 0" class="clear-all-btn">
           清空历史
         </button>
-      </div>
+    </div>
     </div>
     
     <!-- 历史记录遮罩 -->
@@ -132,9 +132,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import '../assets/styles/JsonParser.css'
 
 // 递归查找value
 function getValueByPath(obj: any, path: (string|number)[]): any {
@@ -442,6 +443,29 @@ function generateHash(data: any): string {
   return Math.abs(hash).toString(36).slice(0, 16)
 }
 
+// 保存历史记录到文件
+async function saveHistoryToFile() {
+  try {
+    await invoke('save_json_history', { history: historyList.value })
+    console.log('历史记录已保存到文件')
+  } catch (err) {
+    console.error('保存历史记录失败:', err)
+    showClipboardStatus('error', '保存历史记录失败')
+  }
+}
+
+// 从文件加载历史记录
+async function loadHistoryFromFile() {
+  try {
+    const history = await invoke<HistoryItem[]>('load_json_history')
+    historyList.value = history
+    console.log('已从文件加载历史记录')
+  } catch (err) {
+    console.error('加载历史记录失败:', err)
+    showClipboardStatus('error', '加载历史记录失败')
+  }
+}
+
 function addToHistory(data: any) {
   const hash = generateHash(data)
   
@@ -470,28 +494,22 @@ function addToHistory(data: any) {
   if (historyList.value.length > 20) {
     historyList.value = historyList.value.slice(0, 20)
   }
-}
 
-function toggleHistory() {
-  showHistory.value = !showHistory.value
-}
-
-function loadFromHistory(item: HistoryItem) {
-  parsedJson.value = item.data
-  inputJson.value = JSON.stringify(item.data, null, 2)
-  selectedKeyPath.value = []
-  error.value = ''
-  showHistory.value = false
-  showClipboardStatus('success', '已加载历史记录')
+  // 保存到文件
+  saveHistoryToFile()
 }
 
 function removeFromHistory(index: number) {
   historyList.value.splice(index, 1)
+  // 保存到文件
+  saveHistoryToFile()
 }
 
 function clearHistory() {
   historyList.value = []
   showClipboardStatus('info', '历史记录已清空')
+  // 保存到文件
+  saveHistoryToFile()
 }
 
 function getHistoryPreview(item: HistoryItem): string {
@@ -526,6 +544,40 @@ function formatTime(timestamp: number): string {
   }
 }
 
+// 恢复状态从localStorage
+function restoreState() {
+  try {
+    const savedState = localStorage.getItem('jsonParserState')
+    if (savedState) {
+      const state = JSON.parse(savedState)
+      
+      // 检查状态是否过期（30分钟）
+      const now = Date.now()
+      const thirtyMinutes = 30 * 60 * 1000
+      
+      if (now - state.timestamp < thirtyMinutes) {
+        parsedJson.value = state.parsedJson || null
+        inputJson.value = state.inputJson || ''
+        selectedKeyPath.value = state.selectedKeyPath || []
+        historyList.value = state.historyList || []
+        error.value = ''
+        
+        console.log('JsonParser: 状态已恢复')
+        if (parsedJson.value) {
+          showClipboardStatus('info', '✨ 已恢复之前的JSON解析状态')
+        }
+      } else {
+        // 状态过期，清除
+        localStorage.removeItem('jsonParserState')
+        console.log('JsonParser: 状态已过期，已清除')
+      }
+    }
+  } catch (err) {
+    console.error('JsonParser: 恢复状态失败:', err)
+    localStorage.removeItem('jsonParserState')
+  }
+}
+
 // 检查是否有从PostParser跳转过来的临时JSON数据
 function checkTempJsonData() {
   try {
@@ -545,7 +597,7 @@ function checkTempJsonData() {
       selectedKeyPath.value = []
       error.value = ''
       
-      // 添加到历史记录
+      // 添加到历史记录（这里会自动调用saveHistoryToFile）
       addToHistory(jsonData)
       
       // 显示成功状态
@@ -561,8 +613,6 @@ function checkTempJsonData() {
     localStorage.removeItem('tempJsonData')
   }
 }
-
-
 
 // 检查字符串是否为有效JSON
 const isValidJson = (str: string): boolean => {
@@ -581,10 +631,12 @@ const setupGlobalShortcutListeners = async () => {
     await listen('global-clipboard-json', (event) => {
       const clipboardText = event.payload as string
       try {
-        parsedJson.value = JSON.parse(clipboardText)
+        const parsed = JSON.parse(clipboardText)
+        parsedJson.value = parsed
         inputJson.value = clipboardText
         error.value = ''
-        addToHistory(parsedJson.value)
+        // 添加到历史记录（这里会自动调用saveHistoryToFile）
+        addToHistory(parsed)
         showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动解析')
       } catch (err) {
         error.value = err instanceof Error ? err.message : '无效的JSON格式'
@@ -623,6 +675,7 @@ const getClipboardContent = async () => {
         parsedJson.value = parsed
         inputJson.value = clipboardText
         error.value = ''
+        // 添加到历史记录（这里会自动调用saveHistoryToFile）
         addToHistory(parsed)
         showClipboardStatus('success', '检测到JSON格式，已自动解析')
       } catch (err) {
@@ -725,7 +778,9 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 // 生命周期钩子
-onMounted(() => {
+onMounted(async () => {
+  // 从文件加载历史记录
+  await loadHistoryFromFile()
   // 检查是否有从PostParser跳转过来的临时JSON数据
   checkTempJsonData()
   // 页面加载时自动检查剪贴板
@@ -750,779 +805,41 @@ onActivated(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
+
+// 监听数据变化，自动保存状态
+watch([parsedJson, inputJson, selectedKeyPath, historyList], () => {
+  saveCurrentState()
+}, { deep: true })
+
+// 保存当前状态到localStorage
+function saveCurrentState() {
+  if (parsedJson.value) {
+    const currentState = {
+      parsedJson: parsedJson.value,
+      inputJson: inputJson.value,
+      selectedKeyPath: selectedKeyPath.value,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('jsonParserState', JSON.stringify(currentState))
+    console.log('JsonParser: 状态已保存')
+  }
+}
+
+function toggleHistory() {
+  showHistory.value = !showHistory.value
+}
+
+function loadFromHistory(item: HistoryItem) {
+  parsedJson.value = item.data
+  inputJson.value = JSON.stringify(item.data, null, 2)
+  selectedKeyPath.value = []
+  error.value = ''
+  showHistory.value = false
+  showClipboardStatus('success', '已加载历史记录')
+  saveCurrentState()
+}
 </script>
 
 <style scoped>
-.json-parser {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  height: calc(100vh - 80px);
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-  color: #d4d4d4;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.header h1 {
-  color: #ffffff;
-  margin-bottom: 10px;
-}
-
-.header p {
-  color: #a0a0a0;
-  font-size: 14px;
-}
-
-.content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  flex: 1;
-  min-height: 0;
-}
-
-.input-section,
-.output-section {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #3c3c3c;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #252526;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: #2d2d30;
-  color: #cccccc;
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.section-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-}
-
-.copy-btn,
-.compact-btn,
-.clipboard-btn,
-.history-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.copy-btn:hover:not(:disabled),
-.compact-btn:hover:not(:disabled),
-.clipboard-btn:hover,
-.history-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.clipboard-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-}
-
-.shortcut-hint {
-  font-size: 11px;
-  opacity: 0.8;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
-.global-indicator {
-  font-size: 12px;
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  background: #28a745;
-  color: white;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-.json-tree-container {
-  flex: 1;
-  padding: 8px 12px;
-  background: #1e1e1e;
-  overflow: auto;
-  color: #cccccc;
-}
-
-.json-tree {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
-  font-size: 13px;
-  line-height: 1.4;
-  color: #cccccc;
-}
-
-:deep(.tree-node) {
-  display: flex;
-  align-items: center;
-  padding: 1px 4px;
-  cursor: pointer;
-  user-select: none;
-  color: #cccccc;
-  min-height: 22px;
-  border-radius: 3px;
-  margin: 1px 0;
-  transition: background-color 0.1s ease;
-  position: relative;
-  width: 100%;
-}
-
-:deep(.tree-node.leaf-node) {
-  cursor: pointer;
-}
-
-:deep(.tree-node.selected) {
-  background: #094771;
-  color: #ffffff;
-}
-
-:deep(.tree-node.selected .type-badge) {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-:deep(.tree-node:hover:not(.selected)) {
-  background: #2a2d2e;
-}
-
-:deep(.tree-node:hover:not(.selected) .type-badge) {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-:deep(.expand-icon) {
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 2px;
-  color: #cccccc;
-  font-size: 10px;
-  transition: transform 0.1s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-:deep(.expand-icon::before) {
-  content: '▶';
-  transition: transform 0.1s ease;
-}
-
-:deep(.expand-icon.expanded::before) {
-  transform: rotate(90deg);
-}
-
-:deep(.type-icon) {
-  min-width: 28px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 4px;
-  font-size: 9px;
-  font-weight: 600;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  border-radius: 2px;
-  padding: 1px 3px;
-}
-
-:deep(.type-icon.object) {
-  background: rgba(156, 220, 254, 0.15);
-  color: #9cdcfe;
-  border: 1px solid rgba(156, 220, 254, 0.3);
-}
-
-:deep(.type-icon.array) {
-  background: rgba(156, 220, 254, 0.15);
-  color: #9cdcfe;
-  border: 1px solid rgba(156, 220, 254, 0.3);
-}
-
-:deep(.type-icon.string) {
-  background: rgba(206, 145, 120, 0.15);
-  color: #ce9178;
-  border: 1px solid rgba(206, 145, 120, 0.3);
-}
-
-:deep(.type-icon.number) {
-  background: rgba(181, 206, 168, 0.15);
-  color: #b5cea8;
-  border: 1px solid rgba(181, 206, 168, 0.3);
-}
-
-:deep(.type-icon.boolean) {
-  background: rgba(86, 156, 214, 0.15);
-  color: #569cd6;
-  border: 1px solid rgba(86, 156, 214, 0.3);
-}
-
-:deep(.type-icon.null) {
-  background: rgba(86, 156, 214, 0.15);
-  color: #569cd6;
-  border: 1px solid rgba(86, 156, 214, 0.3);
-}
-
-:deep(.type-badge) {
-  margin-left: auto;
-  padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 10px;
-  color: #a0a0a0;
-  font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-:deep(.node-key) {
-  color: #9cdcfe;
-  font-weight: 400;
-  margin-right: 4px;
-}
-
-:deep(.node-value) {
-  margin-left: 2px;
-  font-weight: 400;
-}
-
-:deep(.node-value.string) {
-  color: #ce9178;
-}
-
-:deep(.node-value.number) {
-  color: #b5cea8;
-}
-
-:deep(.node-value.boolean) {
-  color: #569cd6;
-  font-weight: 400;
-}
-
-:deep(.node-value.null) {
-  color: #569cd6;
-  font-weight: 400;
-}
-
-:deep(.node-value.object),
-:deep(.node-value.array) {
-  color: #cccccc;
-  font-style: normal;
-  opacity: 0.8;
-}
-
-:deep(.tree-children) {
-  margin-left: 12px;
-}
-
-:deep(.tree-node-container) {
-  position: relative;
-}
-
-.json-output {
-  flex: 1;
-  padding: 20px;
-  background: #1e1e1e;
-  overflow: auto;
-  color: #d4d4d4;
-}
-
-.json-display {
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.placeholder {
-  color: #6a6a6a;
-  text-align: center;
-  padding: 40px 20px;
-  font-style: italic;
-}
-
-.placeholder-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.placeholder p {
-  margin: 8px 0;
-}
-
-.placeholder-hint {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.placeholder kbd {
-  background: #3c3c3c;
-  border: 1px solid #555;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 12px;
-  color: #ffffff;
-  font-family: monospace;
-}
-
-.error-message {
-  background: #3c1e1e;
-  color: #f48771;
-  padding: 15px;
-  border-radius: 4px;
-  border-left: 4px solid #e74c3c;
-}
-
-.error-message h4 {
-  margin: 0 0 10px 0;
-  color: #e74c3c;
-}
-
-.error-message p {
-  margin: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-}
-
-.clipboard-status {
-  padding: 10px 20px;
-  font-size: 14px;
-  border-top: 1px solid #3c3c3c;
-  animation: fadeInOut 4s ease-in-out;
-}
-
-.clipboard-status.success {
-  background: #1e3a1e;
-  color: #4caf50;
-  border-left: 4px solid #28a745;
-}
-
-.clipboard-status.error {
-  background: #3c1e1e;
-  color: #f48771;
-  border-left: 4px solid #dc3545;
-}
-
-.clipboard-status.info {
-  background: #1e2a3c;
-  color: #64b5f6;
-  border-left: 4px solid #17a2b8;
-}
-
-@keyframes fadeInOut {
-  0% { opacity: 0; transform: translateY(-10px); }
-  10% { opacity: 1; transform: translateY(0); }
-  90% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-10px); }
-}
-
-.info-panel {
-  margin-top: 20px;
-  padding: 15px;
-  background: #252526;
-  border-radius: 8px;
-  border-left: 4px solid #42b983;
-  border: 1px solid #3c3c3c;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 20px;
-}
-
-.stats h4,
-.keyboard-shortcuts h4 {
-  margin: 0 0 15px 0;
-  color: #ffffff;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.stat-item:last-child {
-  border-bottom: none;
-}
-
-.stat-item span:first-child {
-  font-weight: 500;
-  color: #a0a0a0;
-}
-
-.stat-item span:last-child {
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.keyboard-shortcuts {
-  min-width: 220px;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  color: #a0a0a0;
-  font-size: 14px;
-}
-
-.shortcut-item kbd {
-  background: #3c3c3c;
-  border: 1px solid #555;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 12px;
-  color: #ffffff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-  font-family: monospace;
-}
-
-.shortcut-item span {
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.shortcut-note {
-  font-size: 12px;
-  color: #28a745;
-  margin-top: 8px;
-  padding: 4px 8px;
-  background: rgba(40, 167, 69, 0.1);
-  border-radius: 4px;
-  border-left: 3px solid #28a745;
-}
-
-/* JSON语法高亮样式 - 暗黑主题 */
-:deep(.json-key) {
-  color: #9cdcfe;
-  font-weight: bold;
-}
-
-:deep(.json-string) {
-  color: #ce9178;
-}
-
-:deep(.json-number) {
-  color: #b5cea8;
-}
-
-:deep(.json-boolean) {
-  color: #569cd6;
-  font-weight: bold;
-}
-
-:deep(.json-null) {
-  color: #569cd6;
-  font-weight: bold;
-}
-
-/* 历史记录样式 */
-.history-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-.history-sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 400px;
-  height: 100vh;
-  background: #252526;
-  border-left: 1px solid #3c3c3c;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-}
-
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #3c3c3c;
-  background: #2d2d30;
-}
-
-.history-header h3 {
-  margin: 0;
-  color: #ffffff;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #cccccc;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.history-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-}
-
-.history-empty {
-  text-align: center;
-  color: #6a6a6a;
-  padding: 40px 20px;
-  font-style: italic;
-}
-
-.history-item {
-  background: #1e1e1e;
-  border: 1px solid #3c3c3c;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.history-item:hover {
-  background: #2a2a2a;
-  border-color: #4a4a4a;
-}
-
-.history-preview {
-  color: #d4d4d4;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  margin-bottom: 8px;
-  word-break: break-all;
-}
-
-.history-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.history-time {
-  color: #a0a0a0;
-  font-size: 11px;
-}
-
-.remove-btn {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.remove-btn:hover {
-  background: #c82333;
-}
-
-.history-footer {
-  padding: 20px;
-  border-top: 1px solid #3c3c3c;
-  background: #2d2d30;
-}
-
-.clear-all-btn {
-  width: 100%;
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.clear-all-btn:hover:not(:disabled) {
-  background: #5a6268;
-}
-
-.clear-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .content {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
-  }
-  
-  .json-parser {
-    padding: 10px;
-  }
-  
-  .actions {
-    flex-direction: column;
-    gap: 5px;
-  }
-  
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .shortcut-hint {
-    display: none;
-  }
-  
-  .global-indicator {
-    display: none;
-  }
-  
-  .history-sidebar {
-    width: 100%;
-  }
-}
-
-/* 右键菜单样式 */
-.context-menu {
-  position: fixed;
-  background: #252526;
-  border: 1px solid #3c3c3c;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 2000;
-  min-width: 180px;
-  overflow: hidden;
-  animation: contextMenuFadeIn 0.15s ease-out;
-}
-
-@keyframes contextMenuFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.context-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  cursor: pointer;
-  color: #d4d4d4;
-  font-size: 13px;
-  transition: background-color 0.2s ease;
-  gap: 8px;
-}
-
-.context-menu-item:hover {
-  background: #094771;
-  color: #ffffff;
-}
-
-.context-menu-item:not(:last-child) {
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.menu-icon {
-  font-size: 14px;
-  width: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.menu-key {
-  margin-left: auto;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 11px;
-  color: #9cdcfe;
-  background: rgba(156, 220, 254, 0.1);
-  padding: 2px 6px;
-  border-radius: 3px;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.menu-preview {
-  margin-left: auto;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 11px;
-  color: #a0a0a0;
-  background: rgba(160, 160, 160, 0.1);
-  padding: 2px 6px;
-  border-radius: 3px;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.context-menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1999;
-  background: transparent;
-}
+/* 移除所有内联样式，因为已经移到外部CSS文件中 */
 </style> 
