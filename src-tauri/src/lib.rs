@@ -153,17 +153,24 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             let shortcut = "Ctrl+Shift+G";
             
-            // 注册快捷键并设置处理函数
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, _event| {
+            // 尝试注册快捷键，如果失败则继续运行应用
+            match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, _event| {
                 let handle_clone = handle.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = global_clipboard_shortcut(handle_clone).await {
                         eprintln!("Global shortcut error: {}", e);
                     }
                 });
-            })?;
-            
-            println!("Global shortcut registered: {}", shortcut);
+            }) {
+                Ok(_) => {
+                    println!("Global shortcut registered: {}", shortcut);
+                },
+                Err(e) => {
+                    eprintln!("Warning: Failed to register global shortcut '{}': {}. The application will continue running without global shortcuts.", shortcut, e);
+                    eprintln!("You can still use the app normally, but global shortcuts won't be available.");
+                    eprintln!("This usually happens when the shortcut is already in use by another application or a previous instance.");
+                }
+            }
             
             Ok(())
         })

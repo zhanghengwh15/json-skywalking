@@ -31,6 +31,7 @@
               :selected-path="selectedKeyPath"
               :current-path="[]"
               @select="onSelectKey"
+              @contextmenu="onContextMenu"
             />
           </div>
           <div v-else class="placeholder">
@@ -105,6 +106,28 @@
     
     <!-- 历史记录遮罩 -->
     <div v-if="showHistory" class="history-overlay" @click="toggleHistory"></div>
+    
+    <!-- 右键菜单 -->
+    <div 
+      v-if="showContextMenu" 
+      class="context-menu"
+      :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="copyKey">
+        <span class="menu-icon">📋</span>
+        <span>复制 Key</span>
+        <span class="menu-key">{{ contextMenuData?.key }}</span>
+      </div>
+      <div class="context-menu-item" @click="copyValue">
+        <span class="menu-icon">📄</span>
+        <span>复制 Value</span>
+        <span class="menu-preview">{{ getValuePreview(contextMenuData?.value) }}</span>
+      </div>
+    </div>
+    
+    <!-- 右键菜单遮罩 -->
+    <div v-if="showContextMenu" class="context-menu-overlay" @click="closeContextMenu"></div>
   </div>
 </template>
 
@@ -118,6 +141,16 @@ function getValueByPath(obj: any, path: (string|number)[]): any {
   return path.reduce((acc, key) => (acc !== undefined && acc !== null) ? acc[key] : undefined, obj)
 }
 
+// 获取值的预览文本
+function getValuePreview(value: any): string {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (Array.isArray(value)) return `Array(${value.length})`
+  if (typeof value === 'object') return `Object(${Object.keys(value).length})`
+  if (typeof value === 'string') return value.length > 20 ? value.slice(0, 20) + '...' : value
+  return String(value)
+}
+
 // JSON树节点组件
 const JsonTreeNode = defineComponent({
   name: 'JsonTreeNode',
@@ -129,7 +162,7 @@ const JsonTreeNode = defineComponent({
     selectedPath: { type: Array, default: () => [] },
     currentPath: { type: Array, default: () => [] }
   },
-  emits: ['select'],
+  emits: ['select', 'contextmenu'],
   setup(props, { emit }) {
     const isExpanded = ref(props.level < 2) // 默认展开前两层
     
@@ -151,12 +184,47 @@ const JsonTreeNode = defineComponent({
       return String(value)
     }
     
+    const getTypeIcon = (type: string): string => {
+      switch (type) {
+        case 'object': return '{ }'
+        case 'array': return '[ ]'
+        case 'string': return 'abc'
+        case 'number': return '123'
+        case 'boolean': return 'bool'
+        case 'null': return 'null'
+        default: return 'val'
+      }
+    }
+    
+    const getTypeBadge = (type: string, value: any): string => {
+      if (type === 'array') return `Array(${value.length})`
+      if (type === 'object' && value !== null) return `Object(${Object.keys(value).length})`
+      if (type === 'string') return 'String'
+      if (type === 'number') return 'Number'
+      if (type === 'boolean') return 'Boolean'
+      if (type === 'null') return 'Null'
+      return type
+    }
+    
     const isExpandable = computed(() => props.data !== null && (Array.isArray(props.data) || typeof props.data === 'object'))
     const isSelected = computed(() => JSON.stringify(props.selectedPath) === JSON.stringify(props.currentPath))
     
     const handleSelect = (e: MouseEvent) => {
       e.stopPropagation()
       emit('select', props.currentPath.slice())
+    }
+    
+    const handleRightClick = (e: MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      
+      // 发射右键菜单事件
+      emit('contextmenu', {
+        event: e,
+        key: props.keyName,
+        value: props.data,
+        path: props.currentPath.slice()
+      })
     }
     
     return () => {
@@ -169,12 +237,17 @@ const JsonTreeNode = defineComponent({
         return h('div', {
           class: ['tree-node', 'leaf-node', isSelected.value ? 'selected' : ''],
           style: { paddingLeft: `${indent}px` },
-          onClick: handleSelect
+          onClick: handleSelect,
+          onContextmenu: handleRightClick
         }, [
-          h('span', { class: 'node-key' }, keyName + ': '),
+          // 添加类型图标
+          h('span', { class: `type-icon ${valueType}` }, getTypeIcon(valueType)),
+          h('span', { class: 'node-key' }, isRoot ? '' : keyName + ': '),
           h('span', { 
             class: `node-value ${valueType}` 
-          }, getValuePreview(data))
+          }, getValuePreview(data)),
+          // 添加类型标签
+          h('span', { class: 'type-badge' }, getTypeBadge(valueType, data))
         ])
       }
       
@@ -186,16 +259,20 @@ const JsonTreeNode = defineComponent({
         h('div', {
           class: ['tree-node', 'expandable-node', isSelected.value ? 'selected' : ''],
           style: { paddingLeft: `${indent}px` },
-          onClick: handleSelect
+          onClick: handleSelect,
+          onContextmenu: handleRightClick
         }, [
           h('span', { 
             class: `expand-icon ${isExpanded.value ? 'expanded' : ''}`,
             onClick: (e: MouseEvent) => { e.stopPropagation(); toggleExpanded() }
-          }, isExpanded.value ? '▼' : '▶'),
+          }, ''),
+          h('span', { class: `type-icon ${valueType}` }, getTypeIcon(valueType)),
           !isRoot && h('span', { class: 'node-key' }, keyName + ': '),
           h('span', { 
             class: `node-value ${valueType}` 
-          }, getValuePreview(data))
+          }, getValuePreview(data)),
+          // 添加类型标签
+          h('span', { class: 'type-badge' }, getTypeBadge(valueType, data))
         ])
       )
       
@@ -213,7 +290,8 @@ const JsonTreeNode = defineComponent({
                 level: level + 1,
                 selectedPath,
                 currentPath: [...currentPath, index],
-                onSelect: emit.bind(null, 'select')
+                onSelect: emit.bind(null, 'select'),
+                onContextmenu: emit.bind(null, 'contextmenu')
               })
             )
           })
@@ -227,7 +305,8 @@ const JsonTreeNode = defineComponent({
                 level: level + 1,
                 selectedPath,
                 currentPath: [...currentPath, key],
-                onSelect: emit.bind(null, 'select')
+                onSelect: emit.bind(null, 'select'),
+                onContextmenu: emit.bind(null, 'contextmenu')
               })
             )
           })
@@ -246,10 +325,15 @@ const JsonTreeNode = defineComponent({
 const inputJson = ref('')
 const parsedJson = ref<any>(null)
 const error = ref('')
-const isCompact = ref(false)
+
 const clipboardStatus = ref<{type: 'success' | 'error' | 'info', message: string} | null>(null)
 const selectedKeyPath = ref<(string|number)[]>([])
 const showHistory = ref(false)
+
+// 右键菜单相关
+const showContextMenu = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuData = ref<{ key: string, value: any, path: (string|number)[] } | null>(null)
 
 // 历史记录类型定义
 interface HistoryItem {
@@ -290,6 +374,50 @@ function onSelectKey(path: (string|number)[]) {
   selectedKeyPath.value = path
 }
 
+// 处理右键菜单
+function onContextMenu(event: { event: MouseEvent, key: string, value: any, path: (string|number)[] }) {
+  showContextMenu.value = true
+  contextMenuPosition.value = { x: event.event.clientX, y: event.event.clientY }
+  contextMenuData.value = { 
+    key: event.key, 
+    value: event.value, 
+    path: event.path 
+  }
+}
+
+// 关闭右键菜单
+function closeContextMenu() {
+  showContextMenu.value = false
+  contextMenuData.value = null
+}
+
+// 复制key
+async function copyKey() {
+  if (!contextMenuData.value) return
+  try {
+    await navigator.clipboard.writeText(contextMenuData.value.key)
+    showClipboardStatus('success', '键名已复制到剪贴板！')
+  } catch (err) {
+    showClipboardStatus('error', '复制失败')
+  }
+  closeContextMenu()
+}
+
+// 复制value
+async function copyValue() {
+  if (!contextMenuData.value) return
+  try {
+    const valueStr = typeof contextMenuData.value.value === 'string' 
+      ? contextMenuData.value.value 
+      : JSON.stringify(contextMenuData.value.value, null, 2)
+    await navigator.clipboard.writeText(valueStr)
+    showClipboardStatus('success', '值已复制到剪贴板！')
+  } catch (err) {
+    showClipboardStatus('error', '复制失败')
+  }
+  closeContextMenu()
+}
+
 async function copySelectedValue() {
   if (!parsedJson.value) return
   let val = displayValue.value
@@ -303,24 +431,42 @@ async function copySelectedValue() {
 
 // 历史记录相关函数
 function generateHash(data: any): string {
-  return btoa(JSON.stringify(data)).slice(0, 16)
+  // 使用简单的哈希算法代替btoa，避免中文字符编码问题
+  const str = JSON.stringify(data)
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // 转换为32位整数
+  }
+  return Math.abs(hash).toString(36).slice(0, 16)
 }
 
 function addToHistory(data: any) {
   const hash = generateHash(data)
+  
   // 检查是否已存在相同的JSON
-  if (historyList.value.some(item => item.hash === hash)) {
+  const existingIndex = historyList.value.findIndex(item => item.hash === hash)
+  
+  if (existingIndex !== -1) {
+    // 如果已存在，不做任何操作，保持原来的时间戳和位置
     return
   }
   
+  // 如果不存在，创建新记录
   const historyItem: HistoryItem = {
     data,
     timestamp: Date.now(),
     hash
   }
   
-  // 添加到历史记录开头，最多保存20条
-  historyList.value.unshift(historyItem)
+  // 添加新记录
+  historyList.value.push(historyItem)
+  
+  // 按时间戳排序（最新在前）
+  historyList.value.sort((a, b) => b.timestamp - a.timestamp)
+  
+  // 最多保存20条
   if (historyList.value.length > 20) {
     historyList.value = historyList.value.slice(0, 20)
   }
@@ -355,49 +501,32 @@ function getHistoryPreview(item: HistoryItem): string {
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp)
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const now = new Date()
+  const isCurrentYear = date.getFullYear() === now.getFullYear()
+  
+  if (isCurrentYear) {
+    // 当年的记录只显示月日时分秒
+    return date.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } else {
+    // 不同年份的记录显示完整日期时分秒
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
 }
 
-// JSON统计信息
-const jsonStats = computed(() => {
-  if (!parsedJson.value) return null
-  
-  const getType = (obj: any): string => {
-    if (Array.isArray(obj)) return 'Array'
-    if (obj === null) return 'null'
-    return typeof obj === 'object' ? 'Object' : typeof obj
-  }
-  
-  const countKeys = (obj: any): number => {
-    if (Array.isArray(obj)) return obj.length
-    if (typeof obj === 'object' && obj !== null) {
-      return Object.keys(obj).length
-    }
-    return 0
-  }
-  
-  return {
-    type: getType(parsedJson.value),
-    keyCount: countKeys(parsedJson.value),
-    length: JSON.stringify(parsedJson.value).length
-  }
-})
 
-// 高亮显示的JSON
-const highlightedJson = computed(() => {
-  if (!parsedJson.value) return ''
-  
-  const jsonString = isCompact.value 
-    ? JSON.stringify(parsedJson.value)
-    : JSON.stringify(parsedJson.value, null, 2)
-  
-  return syntaxHighlight(jsonString)
-})
 
 // 检查字符串是否为有效JSON
 const isValidJson = (str: string): boolean => {
@@ -429,7 +558,7 @@ const setupGlobalShortcutListeners = async () => {
     })
     
     // 监听全局快捷键触发的非JSON格式剪贴板事件
-    await listen('global-clipboard-not-json', (event) => {
+    await listen('global-clipboard-not-json', (_event) => {
       showClipboardStatus('error', '🌍 全局快捷键: 剪贴板内容不是有效的JSON格式')
     })
     
@@ -725,7 +854,7 @@ onUnmounted(() => {
   color: #cccccc;
 }
 
-.tree-node {
+:deep(.tree-node) {
   display: flex;
   align-items: center;
   padding: 1px 4px;
@@ -736,22 +865,35 @@ onUnmounted(() => {
   border-radius: 3px;
   margin: 1px 0;
   transition: background-color 0.1s ease;
+  position: relative;
+  width: 100%;
 }
 
-.tree-node.leaf-node {
+:deep(.tree-node.leaf-node) {
   cursor: pointer;
 }
 
-.tree-node.selected {
+:deep(.tree-node.selected) {
   background: #094771;
   color: #ffffff;
 }
 
-.tree-node:hover:not(.selected) {
+:deep(.tree-node.selected .type-badge) {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+:deep(.tree-node:hover:not(.selected)) {
   background: #2a2d2e;
 }
 
-.expand-icon {
+:deep(.tree-node:hover:not(.selected) .type-badge) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+:deep(.expand-icon) {
   width: 16px;
   height: 16px;
   display: inline-flex;
@@ -762,53 +904,120 @@ onUnmounted(() => {
   font-size: 10px;
   transition: transform 0.1s ease;
   cursor: pointer;
+  position: relative;
 }
 
-.expand-icon.expanded {
+:deep(.expand-icon::before) {
+  content: '▶';
+  transition: transform 0.1s ease;
+}
+
+:deep(.expand-icon.expanded::before) {
   transform: rotate(90deg);
 }
 
-.node-key {
+:deep(.type-icon) {
+  min-width: 28px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  border-radius: 2px;
+  padding: 1px 3px;
+}
+
+:deep(.type-icon.object) {
+  background: rgba(156, 220, 254, 0.15);
+  color: #9cdcfe;
+  border: 1px solid rgba(156, 220, 254, 0.3);
+}
+
+:deep(.type-icon.array) {
+  background: rgba(156, 220, 254, 0.15);
+  color: #9cdcfe;
+  border: 1px solid rgba(156, 220, 254, 0.3);
+}
+
+:deep(.type-icon.string) {
+  background: rgba(206, 145, 120, 0.15);
+  color: #ce9178;
+  border: 1px solid rgba(206, 145, 120, 0.3);
+}
+
+:deep(.type-icon.number) {
+  background: rgba(181, 206, 168, 0.15);
+  color: #b5cea8;
+  border: 1px solid rgba(181, 206, 168, 0.3);
+}
+
+:deep(.type-icon.boolean) {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+  border: 1px solid rgba(86, 156, 214, 0.3);
+}
+
+:deep(.type-icon.null) {
+  background: rgba(86, 156, 214, 0.15);
+  color: #569cd6;
+  border: 1px solid rgba(86, 156, 214, 0.3);
+}
+
+:deep(.type-badge) {
+  margin-left: auto;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 10px;
+  color: #a0a0a0;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+:deep(.node-key) {
   color: #9cdcfe;
   font-weight: 400;
   margin-right: 4px;
 }
 
-.node-value {
+:deep(.node-value) {
   margin-left: 2px;
   font-weight: 400;
 }
 
-.node-value.string {
+:deep(.node-value.string) {
   color: #ce9178;
 }
 
-.node-value.number {
+:deep(.node-value.number) {
   color: #b5cea8;
 }
 
-.node-value.boolean {
+:deep(.node-value.boolean) {
   color: #569cd6;
   font-weight: 400;
 }
 
-.node-value.null {
+:deep(.node-value.null) {
   color: #569cd6;
   font-weight: 400;
 }
 
-.node-value.object,
-.node-value.array {
+:deep(.node-value.object),
+:deep(.node-value.array) {
   color: #cccccc;
   font-style: normal;
   opacity: 0.8;
 }
 
-.tree-children {
+:deep(.tree-children) {
   margin-left: 12px;
 }
 
-.tree-node-container {
+:deep(.tree-node-container) {
   position: relative;
 }
 
@@ -1187,5 +1396,95 @@ onUnmounted(() => {
   .history-sidebar {
     width: 100%;
   }
+}
+
+/* 右键菜单样式 */
+.context-menu {
+  position: fixed;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  min-width: 180px;
+  overflow: hidden;
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #d4d4d4;
+  font-size: 13px;
+  transition: background-color 0.2s ease;
+  gap: 8px;
+}
+
+.context-menu-item:hover {
+  background: #094771;
+  color: #ffffff;
+}
+
+.context-menu-item:not(:last-child) {
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.menu-icon {
+  font-size: 14px;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-key {
+  margin-left: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  color: #9cdcfe;
+  background: rgba(156, 220, 254, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-preview {
+  margin-left: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  color: #a0a0a0;
+  background: rgba(160, 160, 160, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1999;
+  background: transparent;
 }
 </style> 
