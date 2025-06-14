@@ -2,18 +2,14 @@
   <div class="json-parser">
     <div class="header">
       <h1>JSON 解析与格式化工具</h1>
-      <p>在左侧输入JSON，点击解析按钮格式化并在右侧显示</p>
+      <p>使用快捷键或按钮从剪贴板加载JSON数据</p>
     </div>
     
     <div class="content">
       <div class="input-section">
         <div class="section-header">
-          <h3>输入JSON</h3>
+          <h3>JSON 结构视图</h3>
           <div class="actions">
-            <button @click="parseJson" :disabled="loading" class="parse-btn">
-              {{ loading ? '解析中...' : '解析 JSON' }}
-            </button>
-            <button @click="clearInput" class="clear-btn">清空</button>
             <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'">
               获取剪贴板
               <span class="shortcut-hint">⌘⇧G</span>
@@ -21,12 +17,25 @@
             </button>
           </div>
         </div>
-        <textarea
-          v-model="inputJson"
-          placeholder="请输入要解析的JSON数据..."
-          class="json-input"
-          @input="resetError"
-        ></textarea>
+        <div class="json-tree-container">
+          <div v-if="error" class="error-message">
+            <h4>解析错误：</h4>
+            <p>{{ error }}</p>
+          </div>
+          <div v-else-if="parsedJson" class="json-tree">
+            <JsonTreeNode 
+              :data="parsedJson" 
+              :key-name="'root'" 
+              :is-root="true"
+              :level="0"
+            />
+          </div>
+          <div v-else class="placeholder">
+            <div class="placeholder-icon">📋</div>
+            <p>使用 <kbd>⌘⇧G</kbd> 从剪贴板加载JSON数据</p>
+            <p class="placeholder-hint">或点击上方的"获取剪贴板"按钮</p>
+          </div>
+        </div>
         <div v-if="clipboardStatus" class="clipboard-status" :class="clipboardStatus.type">
           {{ clipboardStatus.message }}
         </div>
@@ -89,15 +98,136 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+
+// JSON树节点组件
+const JsonTreeNode = defineComponent({
+  name: 'JsonTreeNode',
+  props: {
+    data: {
+      type: [Object, Array, String, Number, Boolean],
+      default: null
+    },
+    keyName: {
+      type: String,
+      default: ''
+    },
+    isRoot: {
+      type: Boolean,
+      default: false
+    },
+    level: {
+      type: Number,
+      default: 0
+    }
+  },
+  setup(props) {
+    const isExpanded = ref(props.level < 2) // 默认展开前两层
+    
+    const toggleExpanded = () => {
+      isExpanded.value = !isExpanded.value
+    }
+    
+    const getValueType = (value: any): string => {
+      if (value === null) return 'null'
+      if (Array.isArray(value)) return 'array'
+      return typeof value
+    }
+    
+    const getValuePreview = (value: any): string => {
+      if (value === null) return 'null'
+      if (Array.isArray(value)) return `Array(${value.length})`
+      if (typeof value === 'object') return `Object(${Object.keys(value).length})`
+      if (typeof value === 'string') return `"${value}"`
+      return String(value)
+    }
+    
+    const isExpandable = computed(() => {
+      return props.data !== null && (Array.isArray(props.data) || typeof props.data === 'object')
+    })
+    
+    return () => {
+      const { data, keyName, isRoot, level } = props
+      const valueType = getValueType(data)
+      const indent = level * 20
+      
+      if (!isExpandable.value) {
+        // 叶子节点
+        return h('div', {
+          class: 'tree-node leaf-node',
+          style: { paddingLeft: `${indent}px` }
+        }, [
+          h('span', { class: 'node-key' }, keyName + ': '),
+          h('span', { 
+            class: `node-value ${valueType}` 
+          }, getValuePreview(data))
+        ])
+      }
+      
+      // 可展开节点
+      const children: any[] = []
+      
+      // 节点头部
+      children.push(
+        h('div', {
+          class: 'tree-node expandable-node',
+          style: { paddingLeft: `${indent}px` },
+          onClick: toggleExpanded
+        }, [
+          h('span', { 
+            class: `expand-icon ${isExpanded.value ? 'expanded' : ''}` 
+          }, isExpanded.value ? '▼' : '▶'),
+          !isRoot && h('span', { class: 'node-key' }, keyName + ': '),
+          h('span', { 
+            class: `node-value ${valueType}` 
+          }, getValuePreview(data))
+        ])
+      )
+      
+      // 子节点
+      if (isExpanded.value) {
+        const childNodes: any[] = []
+        
+        if (Array.isArray(data)) {
+          data.forEach((item, index) => {
+            childNodes.push(
+              h(JsonTreeNode, {
+                key: index,
+                data: item,
+                keyName: `[${index}]`,
+                level: level + 1
+              })
+            )
+          })
+        } else if (typeof data === 'object' && data !== null) {
+          Object.entries(data).forEach(([key, value]) => {
+            childNodes.push(
+              h(JsonTreeNode, {
+                key: key,
+                data: value,
+                keyName: key,
+                level: level + 1
+              })
+            )
+          })
+        }
+        
+        children.push(
+          h('div', { class: 'tree-children' }, childNodes)
+        )
+      }
+      
+      return h('div', { class: 'tree-node-container' }, children)
+    }
+  }
+})
 
 // 响应式数据
 const inputJson = ref('')
 const parsedJson = ref<any>(null)
 const error = ref('')
-const loading = ref(false)
 const isCompact = ref(false)
 const clipboardStatus = ref<{type: 'success' | 'error' | 'info', message: string} | null>(null)
 
@@ -147,32 +277,22 @@ const isValidJson = (str: string): boolean => {
   }
 }
 
-// 键盘事件处理器（本地快捷键作为备用）
-const handleKeydown = (event: KeyboardEvent) => {
-  // 检测 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
-  const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
-  
-  if (isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'g') {
-    event.preventDefault()
-    event.stopPropagation()
-    getClipboardContent()
-  }
-}
-
 // 处理全局快捷键事件
 const setupGlobalShortcutListeners = async () => {
   try {
     // 监听全局快捷键触发的JSON格式剪贴板事件
     await listen('global-clipboard-json', (event) => {
       const clipboardText = event.payload as string
-      inputJson.value = clipboardText
-      showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动填入')
-      
-      // 自动解析JSON
-      setTimeout(() => {
-        parseJson()
-      }, 100)
+      try {
+        parsedJson.value = JSON.parse(clipboardText)
+        inputJson.value = clipboardText
+        error.value = ''
+        showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动解析')
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : '无效的JSON格式'
+        parsedJson.value = null
+        showClipboardStatus('error', '🌍 全局快捷键: JSON解析失败')
+      }
     })
     
     // 监听全局快捷键触发的非JSON格式剪贴板事件
@@ -186,7 +306,7 @@ const setupGlobalShortcutListeners = async () => {
   }
 }
 
-// 获取剪贴板内容
+// 获取剪贴板内容并自动解析
 const getClipboardContent = async () => {
   try {
     const clipboardText = await invoke<string>('get_clipboard')
@@ -196,14 +316,18 @@ const getClipboardContent = async () => {
       return
     }
     
-    // 检查是否为有效JSON
+    // 检查是否为有效JSON并直接解析
     if (isValidJson(clipboardText)) {
-      inputJson.value = clipboardText
-      showClipboardStatus('success', '检测到JSON格式，已自动填入 (本地快捷键)')
-      // 自动解析JSON
-      setTimeout(() => {
-        parseJson()
-      }, 100)
+      try {
+        parsedJson.value = JSON.parse(clipboardText)
+        inputJson.value = clipboardText
+        error.value = ''
+        showClipboardStatus('success', '检测到JSON格式，已自动解析')
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : '无效的JSON格式'
+        parsedJson.value = null
+        showClipboardStatus('error', '解析JSON失败')
+      }
     } else {
       showClipboardStatus('error', '剪贴板内容不是有效的JSON格式')
     }
@@ -218,7 +342,7 @@ const showClipboardStatus = (type: 'success' | 'error' | 'info', message: string
   clipboardStatus.value = { type, message }
   setTimeout(() => {
     clipboardStatus.value = null
-  }, 4000) // 增加到4秒，给用户更多时间看到全局快捷键提示
+  }, 4000)
 }
 
 // 自动检查剪贴板（页面加载时）
@@ -227,57 +351,20 @@ const autoCheckClipboard = async () => {
     const clipboardText = await invoke<string>('get_clipboard')
     
     if (clipboardText && clipboardText.trim() && isValidJson(clipboardText)) {
-      // 如果输入框为空或只有示例数据，则自动填入
-      if (!inputJson.value.trim() || inputJson.value === getExampleJson()) {
+      try {
+        parsedJson.value = JSON.parse(clipboardText)
         inputJson.value = clipboardText
+        error.value = ''
         showClipboardStatus('success', '自动检测到剪贴板中的JSON格式数据')
-        // 自动解析JSON
-        setTimeout(() => {
-          parseJson()
-        }, 100)
+      } catch (err) {
+        // 静默处理错误
+        console.log('自动解析JSON失败:', err)
       }
     }
   } catch (err) {
     // 静默处理错误，不影响正常使用
     console.log('自动检查剪贴板失败:', err)
   }
-}
-
-// 解析JSON
-const parseJson = async () => {
-  if (!inputJson.value.trim()) {
-    error.value = '请输入JSON数据'
-    return
-  }
-  
-  loading.value = true
-  error.value = ''
-  
-  try {
-    // 模拟异步解析（实际上JSON.parse是同步的）
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    parsedJson.value = JSON.parse(inputJson.value)
-    isCompact.value = false
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '无效的JSON格式'
-    parsedJson.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
-// 清空输入
-const clearInput = () => {
-  inputJson.value = ''
-  parsedJson.value = null
-  error.value = ''
-  clipboardStatus.value = null
-}
-
-// 重置错误
-const resetError = () => {
-  error.value = ''
 }
 
 // 复制到剪贴板
@@ -329,29 +416,17 @@ const syntaxHighlight = (json: string): string => {
   })
 }
 
-// 获取示例JSON数据
-const getExampleJson = (): string => {
-  return `{
-  "name": "张三",
-  "age": 30,
-  "isStudent": false,
-  "address": {
-    "city": "北京",
-    "district": "海淀区",
-    "street": "中关村大街1号"
-  },
-  "hobbies": ["编程", "阅读", "运动"],
-  "contact": {
-    "email": "zhangsan@example.com",
-    "phone": "13800138000"
-  },
-  "metadata": null
-}`
-}
-
-// 示例JSON数据
-const loadExample = () => {
-  inputJson.value = getExampleJson()
+// 键盘事件处理器（本地快捷键作为备用）
+const handleKeydown = (event: KeyboardEvent) => {
+  // 检测 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
+  
+  if (isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'g') {
+    event.preventDefault()
+    event.stopPropagation()
+    getClipboardContent()
+  }
 }
 
 // 生命周期钩子
@@ -378,13 +453,6 @@ onActivated(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
-
-// 如果没有剪贴板内容，则加载示例
-setTimeout(() => {
-  if (!inputJson.value.trim()) {
-    loadExample()
-  }
-}, 200)
 </script>
 
 <style scoped>
@@ -395,6 +463,8 @@ setTimeout(() => {
   height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .header {
@@ -403,12 +473,12 @@ setTimeout(() => {
 }
 
 .header h1 {
-  color: #2c3e50;
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
 .header p {
-  color: #666;
+  color: #a0a0a0;
   font-size: 14px;
 }
 
@@ -424,9 +494,10 @@ setTimeout(() => {
 .output-section {
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
+  border: 1px solid #3c3c3c;
   border-radius: 8px;
   overflow: hidden;
+  background: #252526;
 }
 
 .section-header {
@@ -434,8 +505,9 @@ setTimeout(() => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #2d2d30;
+  color: #cccccc;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .section-header h3 {
@@ -448,29 +520,6 @@ setTimeout(() => {
   gap: 10px;
 }
 
-.parse-btn {
-  background: #42b983;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.parse-btn:hover:not(:disabled) {
-  background: #369870;
-  transform: translateY(-1px);
-}
-
-.parse-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.clear-btn,
 .copy-btn,
 .compact-btn,
 .clipboard-btn {
@@ -485,7 +534,6 @@ setTimeout(() => {
   position: relative;
 }
 
-.clear-btn:hover,
 .copy-btn:hover:not(:disabled),
 .compact-btn:hover:not(:disabled),
 .clipboard-btn:hover {
@@ -530,23 +578,96 @@ setTimeout(() => {
   100% { transform: scale(1); }
 }
 
-.json-input {
+.json-tree-container {
   flex: 1;
   padding: 20px;
-  border: none;
-  outline: none;
+  background: #1e1e1e;
+  overflow: auto;
+  color: #d4d4d4;
+}
+
+.json-tree {
   font-family: 'Courier New', monospace;
   font-size: 14px;
-  line-height: 1.5;
-  resize: none;
-  background: #f8f9fa;
+  line-height: 1.6;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-node.leaf-node {
+  cursor: default;
+}
+
+.tree-node.expandable-node:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.expand-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  color: #cccccc;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(0deg);
+}
+
+.node-key {
+  color: #9cdcfe;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.node-value {
+  margin-left: 4px;
+}
+
+.node-value.string {
+  color: #ce9178;
+}
+
+.node-value.number {
+  color: #b5cea8;
+}
+
+.node-value.boolean {
+  color: #569cd6;
+  font-weight: bold;
+}
+
+.node-value.null {
+  color: #569cd6;
+  font-weight: bold;
+}
+
+.node-value.object,
+.node-value.array {
+  color: #cccccc;
+  font-style: italic;
+}
+
+.tree-children {
+  margin-left: 16px;
 }
 
 .json-output {
   flex: 1;
   padding: 20px;
-  background: #f8f9fa;
+  background: #1e1e1e;
   overflow: auto;
+  color: #d4d4d4;
 }
 
 .json-display {
@@ -558,15 +679,39 @@ setTimeout(() => {
 }
 
 .placeholder {
-  color: #999;
+  color: #6a6a6a;
   text-align: center;
   padding: 40px 20px;
   font-style: italic;
 }
 
+.placeholder-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.placeholder p {
+  margin: 8px 0;
+}
+
+.placeholder-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.placeholder kbd {
+  background: #3c3c3c;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #ffffff;
+  font-family: monospace;
+}
+
 .error-message {
-  background: #fee;
-  color: #c33;
+  background: #3c1e1e;
+  color: #f48771;
   padding: 15px;
   border-radius: 4px;
   border-left: 4px solid #e74c3c;
@@ -586,25 +731,25 @@ setTimeout(() => {
 .clipboard-status {
   padding: 10px 20px;
   font-size: 14px;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid #3c3c3c;
   animation: fadeInOut 4s ease-in-out;
 }
 
 .clipboard-status.success {
-  background: #d4edda;
-  color: #155724;
+  background: #1e3a1e;
+  color: #4caf50;
   border-left: 4px solid #28a745;
 }
 
 .clipboard-status.error {
-  background: #f8d7da;
-  color: #721c24;
+  background: #3c1e1e;
+  color: #f48771;
   border-left: 4px solid #dc3545;
 }
 
 .clipboard-status.info {
-  background: #d1ecf1;
-  color: #0c5460;
+  background: #1e2a3c;
+  color: #64b5f6;
   border-left: 4px solid #17a2b8;
 }
 
@@ -618,9 +763,10 @@ setTimeout(() => {
 .info-panel {
   margin-top: 20px;
   padding: 15px;
-  background: #f0f2f5;
+  background: #252526;
   border-radius: 8px;
   border-left: 4px solid #42b983;
+  border: 1px solid #3c3c3c;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 20px;
@@ -629,14 +775,14 @@ setTimeout(() => {
 .stats h4,
 .keyboard-shortcuts h4 {
   margin: 0 0 15px 0;
-  color: #2c3e50;
+  color: #ffffff;
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
   padding: 5px 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .stat-item:last-child {
@@ -645,11 +791,11 @@ setTimeout(() => {
 
 .stat-item span:first-child {
   font-weight: 500;
-  color: #666;
+  color: #a0a0a0;
 }
 
 .stat-item span:last-child {
-  color: #2c3e50;
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -662,23 +808,23 @@ setTimeout(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 0;
-  color: #666;
+  color: #a0a0a0;
   font-size: 14px;
 }
 
 .shortcut-item kbd {
-  background: #fff;
-  border: 1px solid #ccc;
+  background: #3c3c3c;
+  border: 1px solid #555;
   border-radius: 3px;
   padding: 2px 6px;
   font-size: 12px;
-  color: #333;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
   font-family: monospace;
 }
 
 .shortcut-item span {
-  color: #2c3e50;
+  color: #ffffff;
   font-weight: 500;
 }
 
@@ -692,27 +838,27 @@ setTimeout(() => {
   border-left: 3px solid #28a745;
 }
 
-/* JSON语法高亮样式 */
+/* JSON语法高亮样式 - 暗黑主题 */
 :deep(.json-key) {
-  color: #e74c3c;
+  color: #9cdcfe;
   font-weight: bold;
 }
 
 :deep(.json-string) {
-  color: #27ae60;
+  color: #ce9178;
 }
 
 :deep(.json-number) {
-  color: #3498db;
+  color: #b5cea8;
 }
 
 :deep(.json-boolean) {
-  color: #9b59b6;
+  color: #569cd6;
   font-weight: bold;
 }
 
 :deep(.json-null) {
-  color: #95a5a6;
+  color: #569cd6;
   font-weight: bold;
 }
 
