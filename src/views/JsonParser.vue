@@ -526,6 +526,42 @@ function formatTime(timestamp: number): string {
   }
 }
 
+// 检查是否有从PostParser跳转过来的临时JSON数据
+function checkTempJsonData() {
+  try {
+    console.log('JsonParser: 检查临时JSON数据...')
+    const tempData = localStorage.getItem('tempJsonData')
+    console.log('JsonParser: 从localStorage获取的临时数据:', tempData ? '有数据' : '无数据')
+    
+    if (tempData) {
+      console.log('JsonParser: 开始处理临时数据')
+      // 清除localStorage中的临时数据
+      localStorage.removeItem('tempJsonData')
+      
+      // 解析并加载JSON数据
+      const jsonData = JSON.parse(tempData)
+      parsedJson.value = jsonData
+      inputJson.value = tempData
+      selectedKeyPath.value = []
+      error.value = ''
+      
+      // 添加到历史记录
+      addToHistory(jsonData)
+      
+      // 显示成功状态
+      showClipboardStatus('success', '✨ 已从HTTP请求解析工具加载JSON数据')
+      console.log('JsonParser: 临时数据处理完成')
+    } else {
+      console.log('JsonParser: 没有临时数据需要处理')
+    }
+  } catch (err) {
+    console.error('JsonParser: 加载临时JSON数据失败:', err)
+    showClipboardStatus('error', '加载临时JSON数据失败')
+    // 即使失败也要清除localStorage
+    localStorage.removeItem('tempJsonData')
+  }
+}
+
 
 
 // 检查字符串是否为有效JSON
@@ -690,6 +726,8 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 // 生命周期钩子
 onMounted(() => {
+  // 检查是否有从PostParser跳转过来的临时JSON数据
+  checkTempJsonData()
   // 页面加载时自动检查剪贴板
   autoCheckClipboard()
   // 添加键盘事件监听器（本地快捷键作为备用）

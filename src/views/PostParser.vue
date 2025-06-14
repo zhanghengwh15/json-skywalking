@@ -37,6 +37,16 @@
             <button @click="formatCurl" :disabled="!curlCommand" class="format-btn">
               {{ isFormatted ? '压缩' : '格式化' }}
             </button>
+            <button @click="copyUrlPath" :disabled="!parseInfo" class="copy-path-btn">
+              复制路径
+            </button>
+            <button 
+              v-if="parseInfo && parseInfo.method === 'POST' && parseInfo.jsonData" 
+              @click="viewJson" 
+              class="view-json-btn"
+            >
+              查看JSON
+            </button>
           </div>
         </div>
         <div class="post-output">
@@ -49,69 +59,6 @@
           </div>
           <div v-else class="placeholder">
             生成的cURL命令将在这里显示...
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="info-panel" v-if="parseInfo">
-      <div class="info-grid">
-        <div class="info-item">
-          <h4>请求信息</h4>
-          <div class="request-info">
-            <div class="info-row">
-              <span class="label">请求类型：</span>
-              <span class="value method" :class="parseInfo.method.toLowerCase()">{{ parseInfo.method }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">URL路径：</span>
-              <span class="value">{{ parseInfo.urlPath }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">完整URL：</span>
-              <span class="value">{{ parseInfo.fullUrl }}</span>
-            </div>
-            <div class="info-row" v-if="parseInfo.queryParams">
-              <span class="label">查询参数：</span>
-              <span class="value">{{ parseInfo.queryParams.length }} 个</span>
-            </div>
-          </div>
-        </div>
-        <div class="info-item">
-          <h4 v-if="parseInfo.method === 'POST'">JSON 数据</h4>
-          <h4 v-else>查询参数</h4>
-          <div class="json-preview" v-if="parseInfo.method === 'POST' && parseInfo.jsonData">
-            <div class="json-stats">
-              <div class="stat">
-                <span>数据类型：</span>
-                <span>{{ getJsonType(parseInfo.jsonData) }}</span>
-              </div>
-              <div class="stat">
-                <span>字符长度：</span>
-                <span>{{ parseInfo.jsonLength }}</span>
-              </div>
-              <div class="stat">
-                <span>格式状态：</span>
-                <span class="valid">✓ 有效JSON</span>
-              </div>
-            </div>
-            <div class="json-content">
-              <pre v-html="formatJsonWithHighlight(parseInfo.jsonData)"></pre>
-            </div>
-          </div>
-          <div class="query-params" v-else-if="parseInfo.method === 'GET' && parseInfo.queryParams">
-            <div class="params-stats">
-              <div class="stat">
-                <span>参数数量：</span>
-                <span>{{ parseInfo.queryParams.length }}</span>
-              </div>
-            </div>
-            <div class="params-list">
-              <div v-for="param in parseInfo.queryParams" :key="param.key" class="param-item">
-                <span class="param-key">{{ param.key }}:</span>
-                <span class="param-value">{{ param.value }}</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -217,12 +164,21 @@
         </div>
       </div>
     </div>
+    
+    <!-- 提示消息 Toast -->
+    <div v-if="toastMessage" class="toast-container">
+      <div class="toast" :class="toastMessage.type">
+        {{ toastMessage.message }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
+import '../styles/post-parser.css'
 
 // 定义类型
 interface ParseRecord {
@@ -234,6 +190,9 @@ interface ParseRecord {
   curl_command: string
   title?: string
 }
+
+// 获取router实例
+const router = useRouter()
 
 // 响应式数据
 const inputText = ref('')
@@ -247,6 +206,9 @@ const historyRecords = ref<ParseRecord[]>([])
 const historyLoading = ref(false)
 const historySearchQuery = ref('')
 const selectedRecords = ref<Set<string>>(new Set())
+
+// 提示消息状态
+const toastMessage = ref<{type: 'success' | 'error' | 'info', message: string} | null>(null)
 
 // curl模板
 const POST_URL_TEMPLATE = 'curl -X POST -H "Accept-Language:zh-CN" -H "logLevel:debug" -H "Content-Type:application/json" -d \'{}\' --url "http://localhost:8080/{}"'
@@ -289,15 +251,110 @@ const isValidJson = (str: string): boolean => {
   }
 }
 
-// 提取URL路径（去掉:8080/之前的部分）
-const extractUrlPath = (url: string): string => {
-  // 处理完整URL，提取:8080/之后的部分
-  const match = url.match(/:8080\/(.*)/)
-  if (match && match[1]) {
-    return match[1]
+// 智能提取有效的JSON部分（去掉后面的额外内容）
+const extractValidJson = (text: string): string => {
+  text = text.trim()
+  
+  // 如果不是以 { 或 [ 开始，寻找第一个 { 或 [
+  let startIndex = 0
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{' || text[i] === '[') {
+      startIndex = i
+      break
+    }
   }
   
-  // 处理其他端口或localhost的情况
+  if (startIndex === text.length) {
+    return text // 没找到JSON开始符号，返回原文本
+  }
+  
+  // 使用栈来匹配括号，找到完整JSON的结束位置
+  const stack: string[] = []
+  let inString = false
+  let escaped = false
+  
+  for (let i = startIndex; i < text.length; i++) {
+    const char = text[i]
+    
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === '"') {
+        inString = false
+      }
+    } else {
+      if (char === '"') {
+        inString = true
+      } else if (char === '{') {
+        stack.push('}')
+      } else if (char === '[') {
+        stack.push(']')
+      } else if (char === '}' || char === ']') {
+        if (stack.length === 0 || stack.pop() !== char) {
+          // 括号不匹配，继续寻找
+          continue
+        }
+        
+        // 如果栈为空，说明找到了完整的JSON
+        if (stack.length === 0) {
+          return text.substring(startIndex, i + 1)
+        }
+      }
+    }
+  }
+  
+  // 如果没找到完整的JSON结束，尝试验证整个字符串
+  const fullJson = text.substring(startIndex)
+  if (isValidJson(fullJson)) {
+    return fullJson
+  }
+  
+  // 最后尝试按行分割，找到第一个有效的JSON
+  const lines = text.split('\n')
+  let jsonCandidate = ''
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (!trimmedLine || trimmedLine.startsWith('status_code:') || trimmedLine.startsWith('error:')) {
+      continue
+    }
+    
+    jsonCandidate += (jsonCandidate ? ' ' : '') + trimmedLine
+    
+    if (isValidJson(jsonCandidate)) {
+      return jsonCandidate
+    }
+  }
+  
+  return text // 如果所有方法都失败，返回原文本
+}
+
+// 提取URL路径（去掉协议、域名/IP、端口之前的部分）
+const extractUrlPath = (url: string): string => {
+  // 处理完整URL（包含协议）
+  if (url.includes('://')) {
+    try {
+      const urlObj = new URL(url)
+      // 去掉开头的斜杠
+      return urlObj.pathname.replace(/^\/+/, '') + (urlObj.search || '')
+    } catch (e) {
+      // 如果URL构造失败，使用正则表达式提取
+      const match = url.match(/^https?:\/\/[^\/]+\/(.*)/)
+      if (match && match[1]) {
+        return match[1]
+      }
+    }
+  }
+  
+  // 处理特定端口的情况
+  const portMatch = url.match(/:(\d+)\/(.*)/)
+  if (portMatch && portMatch[2]) {
+    return portMatch[2]
+  }
+  
+  // 处理localhost的情况
   if (url.includes('localhost/')) {
     return url.split('localhost/')[1] || url
   }
@@ -340,9 +397,10 @@ const generateGetCurl = (urlPath: string): string => {
 const generatePostCurl = (jsonData: string, urlPath: string): string => {
   // 转义JSON中的单引号
   const escapedJson = jsonData.replace(/'/g, "'\"'\"'")
+  // 使用更精确的替换，避免多个{}替换顺序问题
   return POST_URL_TEMPLATE
-    .replace('{}', escapedJson)
-    .replace('{}', urlPath)
+    .replace("'{}'", `'${escapedJson}'`)
+    .replace("http://localhost:8080/{}", `http://localhost:8080/${urlPath}`)
 }
 
 // 判断是否为POST请求（包含http.body:）
@@ -370,14 +428,14 @@ const parseRequest = async () => {
     
     if (isPost) {
       // POST请求处理
-      const parts = inputText.value.split('http.body:')
+      const bodyIndex = inputText.value.indexOf('http.body:')
       
-      if (parts.length !== 2) {
+      if (bodyIndex === -1) {
         throw new Error('POST请求格式不正确，应该包含 "http.body:" 分隔符')
       }
       
-      const urlPart = parts[0].trim()
-      const jsonPart = parts[1].trim()
+      const urlPart = inputText.value.substring(0, bodyIndex).trim()
+      let jsonPart = inputText.value.substring(bodyIndex + 'http.body:'.length).trim()
       
       if (!urlPart) {
         throw new Error('URL不能为空')
@@ -387,6 +445,9 @@ const parseRequest = async () => {
         throw new Error('JSON数据不能为空')
       }
       
+      // 智能提取有效的JSON部分（去掉后面的额外内容如status_code等）
+      jsonPart = extractValidJson(jsonPart)
+      
       // 验证JSON格式
       if (!isValidJson(jsonPart)) {
         throw new Error('不是有效的JSON格式')
@@ -394,6 +455,16 @@ const parseRequest = async () => {
       
       // 提取URL路径
       const urlPath = extractUrlPath(urlPart)
+      
+      // 调试信息
+      console.log('POST请求解析结果:', {
+        原始输入长度: inputText.value.length,
+        URL部分: urlPart,
+        JSON部分长度: jsonPart.length,
+        JSON开头: jsonPart.substring(0, 100) + (jsonPart.length > 100 ? '...' : ''),
+        提取的路径: urlPath,
+        完整URL: `http://localhost:8080/${urlPath}`
+      })
       
       // 生成curl命令
       const curl = generatePostCurl(jsonPart, urlPath)
@@ -468,16 +539,20 @@ const copyToClipboard = async () => {
   
   try {
     await navigator.clipboard.writeText(curlCommand.value)
-    alert('cURL命令已复制到剪贴板！')
+    showToast('success', '✅ cURL命令已复制！')
   } catch (err) {
     // 降级方案
-    const textArea = document.createElement('textarea')
-    textArea.value = curlCommand.value
-    document.body.appendChild(textArea)
-    textArea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textArea)
-    alert('cURL命令已复制到剪贴板！')
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = curlCommand.value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast('success', '✅ cURL命令已复制！')
+    } catch (fallbackErr) {
+      showToast('error', '❌ 复制失败，请稍后重试')
+    }
   }
 }
 
@@ -486,55 +561,118 @@ const formatCurl = () => {
   isFormatted.value = !isFormatted.value
 }
 
-
-
-// 获取JSON数据类型
-const getJsonType = (data: any): string => {
-  if (Array.isArray(data)) return 'Array'
-  if (data === null) return 'null'
-  return typeof data === 'object' ? 'Object' : typeof data
+// 显示提示消息
+const showToast = (type: 'success' | 'error' | 'info', message: string, duration: number = 1000) => {
+  toastMessage.value = { type, message }
+  setTimeout(() => {
+    toastMessage.value = null
+  }, duration)
 }
 
-// 格式化JSON显示（保留用于其他地方可能的使用）
-// const formatJson = (data: any): string => {
-//   return JSON.stringify(data, null, 2)
-// }
-
-// 格式化JSON并添加语法高亮
-const formatJsonWithHighlight = (data: any): string => {
-  let jsonString = JSON.stringify(data, null, 2)
+// 复制URL路径
+const copyUrlPath = async () => {
+  if (!parseInfo.value) return
   
-  // 先处理键名（属性名）
-  jsonString = jsonString.replace(/"([^"\\]*(\\.[^"\\]*)*)"\s*:/g, '<span class="json-key">"$1"</span><span class="json-punctuation">:</span>')
-  
-  // 处理字符串值
-  jsonString = jsonString.replace(/:\s*"([^"\\]*(\\.[^"\\]*)*)"/g, ': <span class="json-string">"$1"</span>')
-  
-  // 处理数组中的字符串
-  jsonString = jsonString.replace(/\[\s*"([^"\\]*(\\.[^"\\]*)*)"/g, '[<span class="json-string">"$1"</span>')
-  jsonString = jsonString.replace(/,\s*"([^"\\]*(\\.[^"\\]*)*)"/g, ', <span class="json-string">"$1"</span>')
-  
-  // 处理数字
-  jsonString = jsonString.replace(/:\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, ': <span class="json-number">$1</span>')
-  jsonString = jsonString.replace(/\[\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, '[<span class="json-number">$1</span>')
-  jsonString = jsonString.replace(/,\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, ', <span class="json-number">$1</span>')
-  
-  // 处理 null
-  jsonString = jsonString.replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
-  jsonString = jsonString.replace(/\[\s*(null)/g, '[<span class="json-null">$1</span>')
-  jsonString = jsonString.replace(/,\s*(null)/g, ', <span class="json-null">$1</span>')
-  
-  // 处理 boolean
-  jsonString = jsonString.replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>')
-  jsonString = jsonString.replace(/\[\s*(true|false)/g, '[<span class="json-boolean">$1</span>')
-  jsonString = jsonString.replace(/,\s*(true|false)/g, ', <span class="json-boolean">$1</span>')
-  
-  // 处理括号和逗号（排除已经处理过的）
-  jsonString = jsonString.replace(/([{}[\]])/g, '<span class="json-punctuation">$1</span>')
-  jsonString = jsonString.replace(/,(?![^<]*>)/g, '<span class="json-punctuation">,</span>')
-  
-  return jsonString
+  try {
+    await navigator.clipboard.writeText(parseInfo.value.urlPath)
+    showToast('success', '✅ URL路径已复制！')
+  } catch (err) {
+    // 降级方案
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = parseInfo.value.urlPath
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast('success', '✅ URL路径已复制！')
+    } catch (fallbackErr) {
+      showToast('error', '❌ 复制失败，请稍后重试')
+    }
+  }
 }
+
+// 保存当前状态到localStorage
+const saveCurrentState = () => {
+  if (parseInfo.value && curlCommand.value) {
+    const currentState = {
+      inputText: inputText.value,
+      curlCommand: curlCommand.value,
+      parseInfo: parseInfo.value,
+      isFormatted: isFormatted.value,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('postParserState', JSON.stringify(currentState))
+    console.log('PostParser: 状态已保存')
+  }
+}
+
+// 恢复状态从localStorage
+const restoreState = () => {
+  try {
+    const savedState = localStorage.getItem('postParserState')
+    if (savedState) {
+      const state = JSON.parse(savedState)
+      
+      // 检查状态是否过期（30分钟）
+      const now = Date.now()
+      const thirtyMinutes = 30 * 60 * 1000
+      
+      if (now - state.timestamp < thirtyMinutes) {
+        inputText.value = state.inputText || ''
+        curlCommand.value = state.curlCommand || ''
+        parseInfo.value = state.parseInfo || null
+        isFormatted.value = state.isFormatted || false
+        error.value = ''
+        
+        console.log('PostParser: 状态已恢复')
+        showToast('info', '✨ 已恢复之前的解析状态', 2000)
+      } else {
+        // 状态过期，清除
+        localStorage.removeItem('postParserState')
+        console.log('PostParser: 状态已过期，已清除')
+      }
+    }
+  } catch (err) {
+    console.error('PostParser: 恢复状态失败:', err)
+    localStorage.removeItem('postParserState')
+  }
+}
+
+// 查看JSON（跳转到JsonParser页面）
+const viewJson = async () => {
+  if (!parseInfo.value || parseInfo.value.method !== 'POST' || !parseInfo.value.jsonData) return
+  
+  try {
+    // 保存当前状态
+    saveCurrentState()
+    
+    // 将JSON数据存储到localStorage，然后跳转到JsonParser页面
+    const jsonString = JSON.stringify(parseInfo.value.jsonData, null, 2)
+    localStorage.setItem('tempJsonData', jsonString)
+    
+    console.log('准备跳转到JsonParser页面，JSON数据已保存到localStorage')
+    
+    // 使用Vue Router进行页面跳转
+    await router.push('/json-parser')
+    
+    console.log('跳转成功')
+  } catch (err) {
+    console.error('查看JSON失败:', err)
+    showToast('error', '❌ 跳转失败，请稍后重试')
+    
+    // 降级方案：直接修改URL
+    try {
+      window.location.href = '/json-parser'
+    } catch (fallbackErr) {
+      console.error('降级跳转也失败:', fallbackErr)
+    }
+  }
+}
+
+
+
+
 
 
 
@@ -700,9 +838,10 @@ const toggleSelectAll = () => {
 const copyRecordCurl = async (record: ParseRecord) => {
   try {
     await navigator.clipboard.writeText(record.curl_command)
-    alert('cURL 命令已复制到剪贴板！')
+    showToast('success', '✅ cURL 命令已复制！')
   } catch (err) {
     console.error('复制失败:', err)
+    showToast('error', '❌ 复制失败，请稍后重试')
   }
 }
 
@@ -757,13 +896,16 @@ const handleKeydown = async (event: KeyboardEvent) => {
     } catch (error) {
       console.error('读取剪贴板失败:', error)
       // 如果读取剪贴板失败，提示用户手动粘贴
-      alert('无法读取剪贴板内容，请手动粘贴后点击生成 cURL 按钮')
+      showToast('error', '❌ 无法读取剪贴板，请手动粘贴后点击生成 cURL 按钮', 3000)
     }
   }
 }
 
 // 组件挂载时加载历史记录
 onMounted(() => {
+  // 恢复之前的状态
+  restoreState()
+  // 加载历史记录
   loadHistoryRecords()
   // 添加键盘事件监听器
   document.addEventListener('keydown', handleKeydown)
@@ -865,7 +1007,9 @@ onUnmounted(() => {
 .clear-btn,
 .copy-btn,
 .format-btn,
-.history-btn {
+.history-btn,
+.copy-path-btn,
+.view-json-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -879,8 +1023,28 @@ onUnmounted(() => {
 .clear-btn:hover,
 .copy-btn:hover:not(:disabled),
 .format-btn:hover:not(:disabled),
-.history-btn:hover {
+.history-btn:hover,
+.copy-path-btn:hover:not(:disabled),
+.view-json-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.copy-path-btn {
+  background: rgba(52, 152, 219, 0.3);
+  border-color: rgba(52, 152, 219, 0.5);
+}
+
+.copy-path-btn:hover:not(:disabled) {
+  background: rgba(52, 152, 219, 0.5);
+}
+
+.view-json-btn {
+  background: rgba(155, 89, 182, 0.3);
+  border-color: rgba(155, 89, 182, 0.5);
+}
+
+.view-json-btn:hover:not(:disabled) {
+  background: rgba(155, 89, 182, 0.5);
 }
 
 .post-input {
@@ -944,186 +1108,7 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.info-panel {
-  margin-top: 20px;
-  padding: 20px;
-  background: #252526;
-  border-radius: 8px;
-  border-left: 4px solid #42b983;
-  border: 1px solid #3c3c3c;
-}
 
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-}
-
-.info-item h4 {
-  margin: 0 0 15px 0;
-  color: #ffffff;
-}
-
-.request-info {
-  space-y: 8px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #3c3c3c;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.label {
-  font-weight: 500;
-  color: #a0a0a0;
-  min-width: 100px;
-}
-
-.value {
-  color: #ffffff;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  word-break: break-all;
-  text-align: right;
-  flex: 1;
-  margin-left: 10px;
-}
-
-.method {
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: bold;
-}
-
-.method.post {
-  background: #e67e22;
-}
-
-.method.get {
-  background: #27ae60;
-}
-
-.json-preview {
-  max-height: 300px;
-  overflow: hidden;
-}
-
-.json-stats {
-  margin-bottom: 15px;
-}
-
-.stat {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 13px;
-}
-
-.stat span:first-child {
-  color: #a0a0a0;
-}
-
-.stat span:last-child {
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.valid {
-  color: #4caf50 !important;
-}
-
-.json-content {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.json-content pre {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  margin: 0;
-  background: #1e1e1e;
-  padding: 15px;
-  border-radius: 4px;
-  color: #d4d4d4;
-  overflow-x: auto;
-}
-
-/* JSON 语法高亮样式 - 与VS Code Dark主题一致 */
-.json-content .json-key {
-  color: #9cdcfe; /* 浅蓝色 - 键名 */
-}
-
-.json-content .json-string {
-  color: #ce9178; /* 橙黄色 - 字符串值 */
-}
-
-.json-content .json-number {
-  color: #b5cea8; /* 浅绿色 - 数字 */
-}
-
-.json-content .json-boolean {
-  color: #569cd6; /* 蓝色 - 布尔值 */
-}
-
-.json-content .json-null {
-  color: #569cd6; /* 蓝色 - null值 */
-}
-
-.json-content .json-punctuation {
-  color: #d4d4d4; /* 白色 - 标点符号 */
-}
-
-.query-params {
-  max-height: 300px;
-  overflow: hidden;
-}
-
-.params-stats {
-  margin-bottom: 15px;
-}
-
-.params-list {
-  max-height: 200px;
-  overflow-y: auto;
-  background: #2d2d30;
-  padding: 10px;
-  border-radius: 4px;
-}
-
-.param-item {
-  display: flex;
-  padding: 4px 0;
-  border-bottom: 1px solid #3c3c3c;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-}
-
-.param-item:last-child {
-  border-bottom: none;
-}
-
-.param-key {
-  font-weight: bold;
-  color: #9cdcfe;
-  min-width: 120px;
-  margin-right: 10px;
-}
-
-.param-value {
-  color: #d4d4d4;
-  word-break: break-all;
-  flex: 1;
-}
 
 /* 历史记录面板样式 */
 .history-panel {
@@ -1440,16 +1425,61 @@ onUnmounted(() => {
   word-break: break-all;
 }
 
+/* Toast 提示消息样式 */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast {
+  background: #2d2d30;
+  color: #ffffff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 200px;
+  max-width: 400px;
+  border-left: 4px solid;
+  animation: toastSlideIn 0.3s ease-out;
+  pointer-events: auto;
+}
+
+.toast.success {
+  border-left-color: #28a745;
+  background: linear-gradient(135deg, #1e3a1e 0%, #2d2d30 100%);
+}
+
+.toast.error {
+  border-left-color: #dc3545;
+  background: linear-gradient(135deg, #3c1e1e 0%, #2d2d30 100%);
+}
+
+.toast.info {
+  border-left-color: #17a2b8;
+  background: linear-gradient(135deg, #1e2a3c 0%, #2d2d30 100%);
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .content {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
-  }
-  
-  .info-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
   }
   
   .post-parser {
@@ -1465,17 +1495,6 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
-  }
-  
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-  
-  .value {
-    text-align: left;
-    margin-left: 0;
   }
   
   .history-header {
@@ -1520,6 +1539,21 @@ onUnmounted(() => {
   .delete-record-btn {
     width: 30px;
     height: 30px;
+  }
+  
+  /* 移动端 Toast 样式调整 */
+  .toast-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+  
+  .toast {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+    text-align: center;
   }
 }
 </style> 
