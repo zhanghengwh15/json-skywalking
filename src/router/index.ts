@@ -10,6 +10,16 @@ const routes = [
     path: '/about',
     name: 'About',
     component: () => import('../views/About.vue')
+  },
+  {
+    path: '/json-parser',
+    name: 'JsonParser',
+    component: () => import('../views/JsonParser.vue')
+  },
+  {
+    path: '/sql-parser',
+    name: 'SqlParser',
+    component: () => import('../views/SqlParser.vue')
   }
 ]
 
