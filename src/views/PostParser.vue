@@ -2,7 +2,7 @@
   <div class="post-parser">
     <div class="header">
       <h1>HTTP 请求解析工具</h1>
-      <p>支持GET和POST请求，自动生成curl命令</p>
+      <p>支持HTTP请求解析，使用Ctrl+V快速生成curl命令</p>
     </div>
     
     <div class="content">
@@ -14,8 +14,6 @@
               {{ loading ? '解析中...' : '生成 cURL' }}
             </button>
             <button @click="clearInput" class="clear-btn">清空</button>
-            <button @click="loadGetExample" class="example-btn">GET示例</button>
-            <button @click="loadPostExample" class="example-btn">POST示例</button>
             <button @click="toggleHistory" class="history-btn">
               {{ showHistory ? '隐藏历史' : '查看历史' }}
             </button>
@@ -38,9 +36,6 @@
             </button>
             <button @click="formatCurl" :disabled="!curlCommand" class="format-btn">
               {{ isFormatted ? '压缩' : '格式化' }}
-            </button>
-            <button @click="testRequest" :disabled="!curlCommand" class="test-btn">
-              测试请求
             </button>
           </div>
         </div>
@@ -226,7 +221,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
 // 定义类型
@@ -491,45 +486,7 @@ const formatCurl = () => {
   isFormatted.value = !isFormatted.value
 }
 
-// 测试请求
-const testRequest = () => {
-  if (!parseInfo.value) return
-  
-  const shouldExecute = confirm('是否要执行这个请求？请确保服务器正在运行。')
-  if (!shouldExecute) return
-  
-  const headers: Record<string, string> = {
-    'Accept-Language': 'zh-CN',
-    'logLevel': 'debug'
-  }
-  
-  if (parseInfo.value.method === 'POST') {
-    headers['Content-Type'] = 'application/json'
-  }
-  
-  const requestOptions: RequestInit = {
-    method: parseInfo.value.method,
-    headers
-  }
-  
-  if (parseInfo.value.method === 'POST') {
-    requestOptions.body = JSON.stringify(parseInfo.value.jsonData)
-  }
-  
-  fetch(parseInfo.value.fullUrl, requestOptions)
-  .then(response => {
-    if (response.ok) {
-      alert('请求成功！检查浏览器控制台查看响应。')
-      console.log('Response:', response)
-    } else {
-      alert(`请求失败：${response.status} ${response.statusText}`)
-    }
-  })
-  .catch(err => {
-    alert(`请求错误：${err.message}`)
-    console.error('Request error:', err)
-  })
-}
+
 
 // 获取JSON数据类型
 const getJsonType = (data: any): string => {
@@ -579,28 +536,7 @@ const formatJsonWithHighlight = (data: any): string => {
   return jsonString
 }
 
-// 加载GET示例
-const loadGetExample = () => {
-  inputText.value = `http://192.168.100.31/poit-cloud-platform/areaEnergy/describeAreaElecStat?eid=9049ab5eff3c42e0a500ee53bc7e5360&operateUserId=500177&orgId=1000864&uid=427075f2e7ec43d1bd04ebd6d36af240&appVersion=1.0&dateType=day&areaId=7f8a123e49304dbdad5eabbb5229ef1e&statDate=2025-06&statDateEnd=&needLastPeriodRatio=1`
-}
 
-// 加载POST示例
-const loadPostExample = () => {
-  inputText.value = `http://localhost:8080/api/user/create
-http.body: {
-  "name": "张三",
-  "email": "zhangsan@example.com",
-  "age": 28,
-  "department": "技术部",
-  "skills": ["Java", "Python", "Vue"],
-  "address": {
-    "city": "北京",
-    "district": "海淀区",
-    "street": "中关村大街1号"
-  },
-  "isActive": true
-}`
-}
 
 // 生成唯一ID
 const generateId = (): string => {
@@ -795,9 +731,47 @@ const historyStats = computed(() => {
   return { total, getCount, postCount, todayCount }
 })
 
+// 键盘事件处理器
+const handleKeydown = async (event: KeyboardEvent) => {
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
+  
+  // Ctrl+V 或 Command+V 直接读取剪贴板并格式化
+  if (isModifierPressed && event.key.toLowerCase() === 'v') {
+    // 阻止默认粘贴行为
+    event.preventDefault()
+    
+    try {
+      // 读取剪贴板内容
+      const clipboardText = await navigator.clipboard.readText()
+      
+      if (clipboardText.trim()) {
+        // 将内容写入输入框
+        inputText.value = clipboardText.trim()
+        
+        // 自动开始解析格式化
+        setTimeout(() => {
+          parseRequest()
+        }, 50)
+      }
+    } catch (error) {
+      console.error('读取剪贴板失败:', error)
+      // 如果读取剪贴板失败，提示用户手动粘贴
+      alert('无法读取剪贴板内容，请手动粘贴后点击生成 cURL 按钮')
+    }
+  }
+}
+
 // 组件挂载时加载历史记录
 onMounted(() => {
   loadHistoryRecords()
+  // 添加键盘事件监听器
+  document.addEventListener('keydown', handleKeydown)
+})
+
+// 组件卸载时移除事件监听器
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -891,8 +865,6 @@ onMounted(() => {
 .clear-btn,
 .copy-btn,
 .format-btn,
-.example-btn,
-.test-btn,
 .history-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
@@ -907,18 +879,8 @@ onMounted(() => {
 .clear-btn:hover,
 .copy-btn:hover:not(:disabled),
 .format-btn:hover:not(:disabled),
-.example-btn:hover,
-.test-btn:hover:not(:disabled),
 .history-btn:hover {
   background: rgba(255, 255, 255, 0.3);
-}
-
-.test-btn {
-  background: rgba(46, 204, 113, 0.8);
-}
-
-.test-btn:hover:not(:disabled) {
-  background: rgba(39, 174, 96, 0.9);
 }
 
 .post-input {
