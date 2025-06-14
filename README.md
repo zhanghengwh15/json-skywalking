@@ -1,16 +1,107 @@
-# Tauri + Vue + TypeScript
+# Tauri App
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## HTTP 请求解析工具
 
-## Recommended IDE Setup
+这是一个基于 Tauri 的桌面应用程序，提供强大的 HTTP 请求解析和历史记录管理功能。
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+### 🚀 主要功能
 
-## Type Support For `.vue` Imports in TS
+#### HTTP 解析功能
+- **GET 请求解析**：自动解析 URL 和查询参数
+- **POST 请求解析**：支持 JSON 数据验证和格式化
+- **cURL 生成**：自动生成标准 cURL 命令
+- **请求测试**：直接在应用内测试 HTTP 请求
+- **格式化显示**：支持 cURL 命令格式化和压缩
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+#### 历史记录功能 ✨
+- **自动保存**：解析成功的请求自动保存到历史记录
+- **智能搜索**：支持按 URL、请求类型、标题等搜索
+- **批量操作**：支持批量选择和删除历史记录
+- **快速加载**：点击历史记录快速加载到编辑器
+- **数据导出**：支持历史记录导出为 JSON 格式
+- **统计信息**：显示总计、GET/POST 分类、今日记录数等
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+#### 高级功能
+- **一键复制**：复制 cURL 命令或历史记录的命令
+- **相对时间**：友好的时间显示（刚刚、X分钟前等）
+- **数据持久化**：使用 Tauri Store 插件本地存储
+- **响应式设计**：完美适配桌面和移动设备
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+### 📖 使用方法
+
+#### GET 请求
+```
+http://192.168.100.31/api/user/list?page=1&size=10
+```
+
+#### POST 请求
+```
+http://localhost:8080/api/user/create
+http.body: {
+  "name": "张三",
+  "email": "zhangsan@example.com",
+  "age": 28
+}
+```
+
+### 🎯 历史记录功能详解
+
+1. **自动保存**：每次成功解析请求后会自动保存到历史记录
+2. **搜索过滤**：在搜索框中输入关键词快速筛选记录
+3. **批量管理**：
+   - 使用复选框选择多条记录
+   - 点击"全选"快速选择所有记录
+   - 点击"删除选中"批量删除记录
+4. **快速操作**：
+   - 📋：复制该记录的 cURL 命令
+   - ✕：删除单条记录
+5. **数据导出**：点击"导出"按钮将历史记录保存为 JSON 文件
+
+### 🛠️ 开发和构建
+
+#### 开发环境启动
+```bash
+npm install
+npm run tauri dev
+```
+
+#### 构建生产版本
+```bash
+npm run tauri build
+```
+
+### 🎨 界面特色
+
+- **现代化设计**：渐变色彩和流畅动画
+- **语法高亮**：JSON 数据的专业语法高亮显示
+- **直观操作**：清晰的按钮布局和状态反馈
+- **数据统计**：实时显示历史记录统计信息
+
+### 💾 数据存储
+
+历史记录使用 Tauri Store 插件存储在本地 `parse_history.json` 文件中，包含以下信息：
+- 唯一 ID 和时间戳
+- 请求类型（GET/POST）
+- 完整 URL 和 JSON 数据
+- 生成的 cURL 命令
+- 自定义标题
+
+### 🔧 技术栈
+
+- **前端**：Vue 3 + TypeScript + Vite
+- **后端**：Rust + Tauri
+- **存储**：Tauri Store Plugin
+- **剪贴板**：Arboard
+
+### 📝 更新日志
+
+#### v0.1.0
+- ✅ 实现基础 HTTP 请求解析功能
+- ✅ 完整的历史记录管理系统
+- ✅ 搜索、过滤、批量操作功能
+- ✅ 数据导出和统计功能
+- ✅ 响应式设计和现代化 UI
+
+---
+
+**享受高效的 HTTP 请求解析体验！** 🚀

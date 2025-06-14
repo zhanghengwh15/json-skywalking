@@ -20,6 +20,11 @@ const routes = [
     path: '/sql-parser',
     name: 'SqlParser',
     component: () => import('../views/SqlParser.vue')
+  },
+  {
+    path: '/post-parser',
+    name: 'PostParser',
+    component: () => import('../views/PostParser.vue')
   }
 ]
 

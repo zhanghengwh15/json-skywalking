@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+// 移除未使用的import
 </script>
 
 <template>
@@ -20,6 +20,10 @@ import { ref } from "vue";
       <router-link to="/sql-parser" class="tab-item">
         <span class="tab-icon">🗃️</span>
         <span class="tab-text">SQL解析</span>
+      </router-link>
+      <router-link to="/post-parser" class="tab-item">
+        <span class="tab-icon">🌐</span>
+        <span class="tab-text">HTTP解析</span>
       </router-link>
     </nav>
     <main class="main-content">
