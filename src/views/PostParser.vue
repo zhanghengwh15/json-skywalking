@@ -809,6 +809,8 @@ onMounted(() => {
   height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .header {
@@ -817,12 +819,12 @@ onMounted(() => {
 }
 
 .header h1 {
-  color: #2c3e50;
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
 .header p {
-  color: #666;
+  color: #a0a0a0;
   font-size: 14px;
 }
 
@@ -838,9 +840,10 @@ onMounted(() => {
 .output-section {
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
+  border: 1px solid #3c3c3c;
   border-radius: 8px;
   overflow: hidden;
+  background: #252526;
 }
 
 .section-header {
@@ -848,8 +851,9 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-  color: white;
+  background: #2d2d30;
+  color: #cccccc;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .section-header h3 {
@@ -926,14 +930,16 @@ onMounted(() => {
   font-size: 14px;
   line-height: 1.5;
   resize: none;
-  background: #f8f9fa;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .post-output {
   flex: 1;
   padding: 20px;
-  background: #f8f9fa;
+  background: #1e1e1e;
   overflow: auto;
+  color: #d4d4d4;
 }
 
 .curl-display pre {
@@ -951,15 +957,15 @@ onMounted(() => {
 }
 
 .placeholder {
-  color: #999;
+  color: #6a6a6a;
   text-align: center;
   padding: 40px 20px;
   font-style: italic;
 }
 
 .error-message {
-  background: #fee;
-  color: #c33;
+  background: #3c1e1e;
+  color: #f48771;
   padding: 15px;
   border-radius: 4px;
   border-left: 4px solid #e74c3c;
@@ -979,9 +985,10 @@ onMounted(() => {
 .info-panel {
   margin-top: 20px;
   padding: 20px;
-  background: #f0f2f5;
+  background: #252526;
   border-radius: 8px;
-  border-left: 4px solid #3498db;
+  border-left: 4px solid #42b983;
+  border: 1px solid #3c3c3c;
 }
 
 .info-grid {
@@ -992,7 +999,7 @@ onMounted(() => {
 
 .info-item h4 {
   margin: 0 0 15px 0;
-  color: #2c3e50;
+  color: #ffffff;
 }
 
 .request-info {
@@ -1004,7 +1011,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .info-row:last-child {
@@ -1013,12 +1020,12 @@ onMounted(() => {
 
 .label {
   font-weight: 500;
-  color: #666;
+  color: #a0a0a0;
   min-width: 100px;
 }
 
 .value {
-  color: #2c3e50;
+  color: #ffffff;
   font-family: 'Courier New', monospace;
   font-size: 13px;
   word-break: break-all;
@@ -1060,16 +1067,16 @@ onMounted(() => {
 }
 
 .stat span:first-child {
-  color: #666;
+  color: #a0a0a0;
 }
 
 .stat span:last-child {
-  color: #2c3e50;
+  color: #ffffff;
   font-weight: 600;
 }
 
 .valid {
-  color: #27ae60 !important;
+  color: #4caf50 !important;
 }
 
 .json-content {
@@ -1126,7 +1133,7 @@ onMounted(() => {
 .params-list {
   max-height: 200px;
   overflow-y: auto;
-  background: #ecf0f1;
+  background: #2d2d30;
   padding: 10px;
   border-radius: 4px;
 }
@@ -1134,7 +1141,7 @@ onMounted(() => {
 .param-item {
   display: flex;
   padding: 4px 0;
-  border-bottom: 1px solid #bdc3c7;
+  border-bottom: 1px solid #3c3c3c;
   font-family: 'Courier New', monospace;
   font-size: 12px;
 }
@@ -1145,13 +1152,13 @@ onMounted(() => {
 
 .param-key {
   font-weight: bold;
-  color: #2980b9;
+  color: #9cdcfe;
   min-width: 120px;
   margin-right: 10px;
 }
 
 .param-value {
-  color: #2c3e50;
+  color: #d4d4d4;
   word-break: break-all;
   flex: 1;
 }
@@ -1159,9 +1166,9 @@ onMounted(() => {
 /* 历史记录面板样式 */
 .history-panel {
   margin-top: 20px;
-  border: 1px solid #ddd;
+  border: 1px solid #3c3c3c;
   border-radius: 8px;
-  background: #fff;
+  background: #252526;
   max-height: 600px;
   display: flex;
   flex-direction: column;
@@ -1172,11 +1179,12 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
-  color: white;
+  background: #2d2d30;
+  color: #cccccc;
   border-radius: 8px 8px 0 0;
   flex-wrap: wrap;
   gap: 10px;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .history-stats {
@@ -1261,8 +1269,8 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 15px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: #2d2d30;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .search-box {
@@ -1274,16 +1282,18 @@ onMounted(() => {
 .search-input {
   width: 100%;
   padding: 8px 30px 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid #3c3c3c;
   border-radius: 20px;
   font-size: 14px;
   outline: none;
   transition: all 0.3s ease;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .search-input:focus {
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+  border-color: #42b983;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.1);
 }
 
 .search-icon {
@@ -1291,7 +1301,7 @@ onMounted(() => {
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: #666;
+  color: #a0a0a0;
   pointer-events: none;
 }
 
@@ -1325,7 +1335,7 @@ onMounted(() => {
 .history-empty {
   text-align: center;
   padding: 40px 20px;
-  color: #666;
+  color: #6a6a6a;
   font-style: italic;
 }
 
@@ -1336,26 +1346,26 @@ onMounted(() => {
 }
 
 .history-item {
-  border: 1px solid #e0e0e0;
+  border: 1px solid #3c3c3c;
   border-radius: 6px;
   padding: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: #fafafa;
+  background: #2d2d30;
   position: relative;
 }
 
 .history-item:hover {
-  border-color: #3498db;
-  background: #f0f8ff;
+  border-color: #42b983;
+  background: #363636;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
+  box-shadow: 0 2px 8px rgba(66, 185, 131, 0.1);
 }
 
 .history-item.selected {
-  border-color: #3498db;
-  background: #e8f4fd;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+  border-color: #42b983;
+  background: #2a4a38;
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.1);
 }
 
 .history-item-header {
@@ -1402,7 +1412,7 @@ onMounted(() => {
 
 .history-title {
   font-weight: 600;
-  color: #2c3e50;
+  color: #ffffff;
 }
 
 .history-item-actions {
@@ -1413,7 +1423,7 @@ onMounted(() => {
 
 .history-time {
   font-size: 12px;
-  color: #666;
+  color: #a0a0a0;
 }
 
 .copy-curl-btn,
@@ -1431,12 +1441,12 @@ onMounted(() => {
 }
 
 .copy-curl-btn {
-  background: #3498db;
+  background: #42b983;
   color: white;
 }
 
 .copy-curl-btn:hover {
-  background: #2980b9;
+  background: #369870;
   transform: scale(1.1);
 }
 
@@ -1453,7 +1463,7 @@ onMounted(() => {
 .history-item-url {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #2980b9;
+  color: #9cdcfe;
   margin-bottom: 4px;
   word-break: break-all;
 }
@@ -1461,8 +1471,8 @@ onMounted(() => {
 .history-item-curl {
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  color: #666;
-  background: #ecf0f1;
+  color: #a0a0a0;
+  background: #1e1e1e;
   padding: 4px 8px;
   border-radius: 3px;
   word-break: break-all;

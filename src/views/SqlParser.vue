@@ -314,6 +314,8 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .header {
@@ -322,12 +324,12 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 }
 
 .header h1 {
-  color: #2c3e50;
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
 .header p {
-  color: #666;
+  color: #a0a0a0;
   font-size: 14px;
 }
 
@@ -343,9 +345,10 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 .output-section {
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
+  border: 1px solid #3c3c3c;
   border-radius: 8px;
   overflow: hidden;
+  background: #252526;
 }
 
 .section-header {
@@ -353,8 +356,9 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
+  background: #2d2d30;
+  color: #cccccc;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .section-header h3 {
@@ -419,14 +423,16 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   font-size: 14px;
   line-height: 1.5;
   resize: none;
-  background: #f8f9fa;
+  background: #1e1e1e;
+  color: #d4d4d4;
 }
 
 .sql-output {
   flex: 1;
   padding: 20px;
-  background: #f8f9fa;
+  background: #1e1e1e;
   overflow: auto;
+  color: #d4d4d4;
 }
 
 .sql-display pre {
@@ -443,15 +449,15 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 }
 
 .placeholder {
-  color: #999;
+  color: #6a6a6a;
   text-align: center;
   padding: 40px 20px;
   font-style: italic;
 }
 
 .error-message {
-  background: #fee;
-  color: #c33;
+  background: #3c1e1e;
+  color: #f48771;
   padding: 15px;
   border-radius: 4px;
   border-left: 4px solid #e74c3c;
@@ -471,9 +477,10 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 .info-panel {
   margin-top: 20px;
   padding: 20px;
-  background: #f0f2f5;
+  background: #252526;
   border-radius: 8px;
-  border-left: 4px solid #e74c3c;
+  border-left: 4px solid #42b983;
+  border: 1px solid #3c3c3c;
 }
 
 .info-grid {
@@ -484,7 +491,7 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 
 .info-item h4 {
   margin: 0 0 15px 0;
-  color: #2c3e50;
+  color: #ffffff;
 }
 
 .params-list {
@@ -497,7 +504,7 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .param-item:last-child {
@@ -505,7 +512,7 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 }
 
 .param-index {
-  background: #3498db;
+  background: #42b983;
   color: white;
   width: 24px;
   height: 24px;
@@ -520,14 +527,15 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 .param-value {
   flex: 1;
   font-family: 'Courier New', monospace;
-  background: #ecf0f1;
+  background: #2d2d30;
   padding: 4px 8px;
   border-radius: 3px;
   font-size: 13px;
+  color: #d4d4d4;
 }
 
 .param-type {
-  background: #95a5a6;
+  background: #6c757d;
   color: white;
   padding: 2px 8px;
   border-radius: 12px;
@@ -539,7 +547,7 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #3c3c3c;
 }
 
 .stat-item:last-child {
@@ -548,11 +556,11 @@ db.sql.parameters: [1, 2024-01-01, 100, 张三, 10]`
 
 .stat-item span:first-child {
   font-weight: 500;
-  color: #666;
+  color: #a0a0a0;
 }
 
 .stat-item span:last-child {
-  color: #2c3e50;
+  color: #ffffff;
   font-weight: 600;
 }
 
