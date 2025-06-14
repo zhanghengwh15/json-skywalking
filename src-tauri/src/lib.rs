@@ -1,8 +1,8 @@
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, Emitter};
+use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
-use tauri_plugin_global_shortcut;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParseRecord {
@@ -153,15 +153,15 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             let shortcut = "Ctrl+Shift+G";
             
-            app.global_shortcut().register(shortcut, move || {
+            // 注册快捷键并设置处理函数
+            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, _event| {
                 let handle_clone = handle.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = global_clipboard_shortcut(handle_clone).await {
                         eprintln!("Global shortcut error: {}", e);
                     }
                 });
-            })
-            .map_err(|e| format!("Failed to register global shortcut: {}", e))?;
+            })?;
             
             println!("Global shortcut registered: {}", shortcut);
             

@@ -14,9 +14,10 @@
               {{ loading ? '解析中...' : '解析 JSON' }}
             </button>
             <button @click="clearInput" class="clear-btn">清空</button>
-            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (⌘⇧G)'">
+            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'">
               获取剪贴板
               <span class="shortcut-hint">⌘⇧G</span>
+              <span class="global-indicator">🌍</span>
             </button>
           </div>
         </div>
@@ -77,7 +78,10 @@
         <h4>快捷键</h4>
         <div class="shortcut-item">
           <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd>
-          <span>获取剪贴板</span>
+          <span>全局获取剪贴板 🌍</span>
+        </div>
+        <div class="shortcut-note">
+          💡 即使软件在后台运行也可以使用
         </div>
       </div>
     </div>
@@ -87,6 +91,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 // 响应式数据
 const inputJson = ref('')
@@ -142,7 +147,7 @@ const isValidJson = (str: string): boolean => {
   }
 }
 
-// 键盘事件处理器
+// 键盘事件处理器（本地快捷键作为备用）
 const handleKeydown = (event: KeyboardEvent) => {
   // 检测 Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux)
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
@@ -152,6 +157,32 @@ const handleKeydown = (event: KeyboardEvent) => {
     event.preventDefault()
     event.stopPropagation()
     getClipboardContent()
+  }
+}
+
+// 处理全局快捷键事件
+const setupGlobalShortcutListeners = async () => {
+  try {
+    // 监听全局快捷键触发的JSON格式剪贴板事件
+    await listen('global-clipboard-json', (event) => {
+      const clipboardText = event.payload as string
+      inputJson.value = clipboardText
+      showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动填入')
+      
+      // 自动解析JSON
+      setTimeout(() => {
+        parseJson()
+      }, 100)
+    })
+    
+    // 监听全局快捷键触发的非JSON格式剪贴板事件
+    await listen('global-clipboard-not-json', (event) => {
+      showClipboardStatus('error', '🌍 全局快捷键: 剪贴板内容不是有效的JSON格式')
+    })
+    
+    console.log('Global shortcut event listeners registered')
+  } catch (err) {
+    console.error('Failed to setup global shortcut listeners:', err)
   }
 }
 
@@ -168,7 +199,7 @@ const getClipboardContent = async () => {
     // 检查是否为有效JSON
     if (isValidJson(clipboardText)) {
       inputJson.value = clipboardText
-      showClipboardStatus('success', '检测到JSON格式，已自动填入 (快捷键生效)')
+      showClipboardStatus('success', '检测到JSON格式，已自动填入 (本地快捷键)')
       // 自动解析JSON
       setTimeout(() => {
         parseJson()
@@ -187,7 +218,7 @@ const showClipboardStatus = (type: 'success' | 'error' | 'info', message: string
   clipboardStatus.value = { type, message }
   setTimeout(() => {
     clipboardStatus.value = null
-  }, 3000)
+  }, 4000) // 增加到4秒，给用户更多时间看到全局快捷键提示
 }
 
 // 自动检查剪贴板（页面加载时）
@@ -327,8 +358,10 @@ const loadExample = () => {
 onMounted(() => {
   // 页面加载时自动检查剪贴板
   autoCheckClipboard()
-  // 添加键盘事件监听器
+  // 添加键盘事件监听器（本地快捷键作为备用）
   document.addEventListener('keydown', handleKeydown)
+  // 设置全局快捷键事件监听器
+  setupGlobalShortcutListeners()
 })
 
 // 组件激活时（用于keep-alive情况）
@@ -337,6 +370,8 @@ onActivated(() => {
   autoCheckClipboard()
   // 确保键盘事件监听器存在
   document.addEventListener('keydown', handleKeydown)
+  // 重新设置全局快捷键事件监听器
+  setupGlobalShortcutListeners()
 })
 
 // 组件卸载时移除事件监听器
@@ -461,6 +496,7 @@ setTimeout(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
 }
 
 .shortcut-hint {
@@ -470,6 +506,28 @@ setTimeout(() => {
   padding: 2px 6px;
   border-radius: 3px;
   font-family: monospace;
+}
+
+.global-indicator {
+  font-size: 12px;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #28a745;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 .json-input {
@@ -529,7 +587,7 @@ setTimeout(() => {
   padding: 10px 20px;
   font-size: 14px;
   border-top: 1px solid #ddd;
-  animation: fadeInOut 3s ease-in-out;
+  animation: fadeInOut 4s ease-in-out;
 }
 
 .clipboard-status.success {
@@ -596,7 +654,7 @@ setTimeout(() => {
 }
 
 .keyboard-shortcuts {
-  min-width: 200px;
+  min-width: 220px;
 }
 
 .shortcut-item {
@@ -622,6 +680,16 @@ setTimeout(() => {
 .shortcut-item span {
   color: #2c3e50;
   font-weight: 500;
+}
+
+.shortcut-note {
+  font-size: 12px;
+  color: #28a745;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #28a745;
 }
 
 /* JSON语法高亮样式 */
@@ -675,6 +743,10 @@ setTimeout(() => {
   }
   
   .shortcut-hint {
+    display: none;
+  }
+  
+  .global-indicator {
     display: none;
   }
 }
