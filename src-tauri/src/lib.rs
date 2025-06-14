@@ -1,6 +1,7 @@
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use tauri::Manager;
+use tauri_plugin_store::StoreExt;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParseRecord {
@@ -37,48 +38,42 @@ async fn save_parse_record(
     app: tauri::AppHandle,
     record: ParseRecord,
 ) -> Result<(), String> {
-    use tauri_plugin_store::{with_store, StoreCollection};
+    let store = app.store("parse_history.json")
+        .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let stores = app.state::<StoreCollection<tauri::Wry>>();
-    let path = std::path::PathBuf::from("parse_history.json");
+    // 获取现有记录
+    let mut records: Vec<ParseRecord> = store
+        .get("records")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
     
-    with_store(app, stores, path, |store| {
-        // 获取现有记录
-        let mut records: Vec<ParseRecord> = store
-            .get("records")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
-        
-        // 添加新记录到开头
-        records.insert(0, record);
-        
-        // 限制最多保存100条记录
-        if records.len() > 100 {
-            records.truncate(100);
-        }
-        
-        // 保存更新后的记录
-        store.insert("records".to_string(), serde_json::to_value(&records).unwrap())?;
-        store.save()
-    })
-    .map_err(|e| format!("Failed to save record: {}", e))
+    // 添加新记录到开头
+    records.insert(0, record);
+    
+    // 限制最多保存100条记录
+    if records.len() > 100 {
+        records.truncate(100);
+    }
+    
+    // 保存更新后的记录
+    store.set("records".to_string(), serde_json::to_value(&records).unwrap());
+    store.save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 async fn get_parse_records(app: tauri::AppHandle) -> Result<Vec<ParseRecord>, String> {
-    use tauri_plugin_store::{with_store, StoreCollection};
+    let store = app.store("parse_history.json")
+        .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let stores = app.state::<StoreCollection<tauri::Wry>>();
-    let path = std::path::PathBuf::from("parse_history.json");
+    let records: Vec<ParseRecord> = store
+        .get("records")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
     
-    with_store(app, stores, path, |store| {
-        let records: Vec<ParseRecord> = store
-            .get("records")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
-        Ok(records)
-    })
-    .map_err(|e| format!("Failed to get records: {}", e))
+    Ok(records)
 }
 
 #[tauri::command]
@@ -86,39 +81,35 @@ async fn delete_parse_record(
     app: tauri::AppHandle,
     record_id: String,
 ) -> Result<(), String> {
-    use tauri_plugin_store::{with_store, StoreCollection};
+    let store = app.store("parse_history.json")
+        .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let stores = app.state::<StoreCollection<tauri::Wry>>();
-    let path = std::path::PathBuf::from("parse_history.json");
+    let mut records: Vec<ParseRecord> = store
+        .get("records")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
     
-    with_store(app, stores, path, |store| {
-        let mut records: Vec<ParseRecord> = store
-            .get("records")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
-        
-        // 删除指定ID的记录
-        records.retain(|r| r.id != record_id);
-        
-        // 保存更新后的记录
-        store.insert("records".to_string(), serde_json::to_value(&records).unwrap())?;
-        store.save()
-    })
-    .map_err(|e| format!("Failed to delete record: {}", e))
+    // 删除指定ID的记录
+    records.retain(|r| r.id != record_id);
+    
+    // 保存更新后的记录
+    store.set("records".to_string(), serde_json::to_value(&records).unwrap());
+    store.save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
+    
+    Ok(())
 }
 
 #[tauri::command]
 async fn clear_parse_records(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_store::{with_store, StoreCollection};
+    let store = app.store("parse_history.json")
+        .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let stores = app.state::<StoreCollection<tauri::Wry>>();
-    let path = std::path::PathBuf::from("parse_history.json");
+    store.set("records".to_string(), serde_json::to_value(Vec::<ParseRecord>::new()).unwrap());
+    store.save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
     
-    with_store(app, stores, path, |store| {
-        store.insert("records".to_string(), serde_json::to_value(Vec::<ParseRecord>::new()).unwrap())?;
-        store.save()
-    })
-    .map_err(|e| format!("Failed to clear records: {}", e))
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

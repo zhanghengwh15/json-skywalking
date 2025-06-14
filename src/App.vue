@@ -9,10 +9,6 @@
         <span class="tab-icon">🏠</span>
         <span class="tab-text">首页</span>
       </router-link>
-      <router-link to="/about" class="tab-item">
-        <span class="tab-icon">ℹ️</span>
-        <span class="tab-text">关于</span>
-      </router-link>
       <router-link to="/json-parser" class="tab-item">
         <span class="tab-icon">🔧</span>
         <span class="tab-text">JSON解析</span>
