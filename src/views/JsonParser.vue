@@ -638,9 +638,9 @@ const setupGlobalShortcutListeners = async () => {
         // 添加到历史记录（这里会自动调用saveHistoryToFile）
         addToHistory(parsed)
         showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动解析')
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '无效的JSON格式'
-    parsedJson.value = null
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : '无效的JSON格式'
+        parsedJson.value = null
         showClipboardStatus('error', '🌍 全局快捷键: JSON解析失败')
       }
     })
@@ -674,7 +674,7 @@ const getClipboardContent = async () => {
         const parsed = JSON.parse(clipboardText)
         parsedJson.value = parsed
         inputJson.value = clipboardText
-  error.value = ''
+        error.value = ''
         // 添加到历史记录（这里会自动调用saveHistoryToFile）
         addToHistory(parsed)
         showClipboardStatus('success', '检测到JSON格式，已自动解析')

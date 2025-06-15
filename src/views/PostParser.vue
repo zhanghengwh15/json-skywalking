@@ -131,11 +131,11 @@
                   @click.stop="toggleRecordSelection(record.id)"
                   class="record-checkbox"
                 />
-              <div class="history-item-title">
-                <span class="history-method" :class="record.request_type.toLowerCase()">
-                  {{ record.request_type }}
-                </span>
-                <span class="history-title">{{ record.title }}</span>
+                <div class="history-item-title">
+                  <span class="history-method" :class="record.request_type.toLowerCase()">
+                    {{ record.request_type }}
+                  </span>
+                  <span class="history-title">{{ record.title }}</span>
                 </div>
               </div>
               <div class="history-item-actions">
@@ -516,6 +516,10 @@ const parseRequest = async () => {
     error.value = err instanceof Error ? err.message : '解析失败'
   } finally {
     loading.value = false
+    // 解析成功后自动复制生成的 cURL 到剪贴板
+    if (!error.value && curlCommand.value) {
+      await copyToClipboard()
+    }
   }
 }
 
@@ -876,7 +880,7 @@ const handleKeydown = async (event: KeyboardEvent) => {
     
     try {
       // 读取剪贴板内容
-      const clipboardText = await navigator.clipboard.readText()
+      const clipboardText = String(await invoke('get_clipboard'))
       
       if (clipboardText.trim()) {
         // 将内容写入输入框

@@ -1,10 +1,10 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "console")]
+
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
-use rand::random;
-use chrono::Utc;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParseRecord {
@@ -37,22 +37,15 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn get_clipboard() -> Result<String, String> {
-    match Clipboard::new() {
-        Ok(mut clipboard) => {
-            match clipboard.get_text() {
-                Ok(text) => Ok(text),
-                Err(e) => Err(format!("Failed to get clipboard text: {}", e))
-            }
-        },
-        Err(e) => Err(format!("Failed to create clipboard: {}", e))
-    }
+fn get_clipboard(_app_handle: tauri::AppHandle) -> Result<String, String> {
+    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
+    clipboard.get_text().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn global_clipboard_shortcut(app: tauri::AppHandle) -> Result<String, String> {
     // 先尝试获取剪贴板内容
-    let clipboard_text = match get_clipboard() {
+    let clipboard_text = match get_clipboard(app.clone()) {
         Ok(text) => text,
         Err(e) => return Err(e),
     };
@@ -302,10 +295,13 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|_app, _shortcut, _event| {
+                    println!("[GlobalShortcut] 快捷键被触发");
                     let handle = _app.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Err(e) = process_clipboard_content(handle).await {
-                            eprintln!("Error processing clipboard: {}", e);
+                            eprintln!("[GlobalShortcut] 处理剪贴板内容出错: {}", e);
+                        } else {
+                            println!("[GlobalShortcut] 剪贴板内容处理完成");
                         }
                     });
                 })
@@ -325,9 +321,11 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
-                let shortcut = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyF);
-                app.global_shortcut().register(shortcut)?;
-                println!("Global shortcut registered successfully");
+                let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyQ);
+                match app.global_shortcut().register(shortcut) {
+                    Ok(_) => println!("[GlobalShortcut] 快捷键注册成功: CTRL+ALT+Q"),
+                    Err(e) => eprintln!("[GlobalShortcut] 快捷键注册失败: {}", e),
+                }
             }
             Ok(())
         })

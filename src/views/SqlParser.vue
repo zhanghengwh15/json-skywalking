@@ -52,13 +52,13 @@
         </div>
       </div>
     </div>
-
+    
     <!-- 历史记录侧边栏 -->
     <div v-if="showHistory" class="history-sidebar">
       <div class="history-header">
         <h3>历史记录</h3>
         <button @click="toggleHistory" class="close-btn">✕</button>
-      </div>
+            </div>
       <div class="history-content">
         <div v-if="historyList.length === 0" class="history-empty">
           暂无历史记录
@@ -72,11 +72,11 @@
           >
             <div class="history-preview">
               {{ item.sql.length > 100 ? item.sql.slice(0, 100) + '...' : item.sql }}
-            </div>
+          </div>
             <div class="history-meta">
               <span class="history-time">{{ formatTime(item.timestamp) }}</span>
               <button @click.stop="removeFromHistory(index)" class="remove-btn">删除</button>
-            </div>
+          </div>
           </div>
         </div>
       </div>
