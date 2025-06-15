@@ -146,11 +146,13 @@ async function saveHistoryToFile() {
 // 从文件加载历史记录
 async function loadHistoryFromFile() {
   try {
+    console.log('开始从文件加载SQL历史记录...');
     const history = await invoke<SqlHistoryItem[]>('load_sql_history')
-    historyList.value = history
-    console.log('已从文件加载SQL历史记录')
+    historyList.value = history || [] // 确保返回 null 或 undefined 时不会报错
+    console.log(`成功加载 ${history.length} 条SQL历史记录。`)
   } catch (err) {
     console.error('加载SQL历史记录失败:', err)
+    historyList.value = [] // 加载失败时清空列表
   }
 }
 
@@ -469,7 +471,8 @@ onMounted(async () => {
 })
 
 onActivated(async () => {
-  // 组件激活时自动处理剪贴板内容
+  // 组件激活时自动处理剪贴板内容，并重新加载历史
+  await loadHistoryFromFile()
   await autoProcessClipboard()
 })
 

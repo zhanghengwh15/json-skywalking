@@ -153,17 +153,40 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
             clipboard.set_text(&formatted).ok();
         }
         // 保存到 SQL 历史
-        let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-        std::fs::create_dir_all(&app_dir).ok();
+        println!("[SQL History] 开始保存历史记录...");
+        let app_dir = match app.path().app_data_dir() {
+            Ok(dir) => {
+                println!("[SQL History] 应用数据目录: {:?}", dir);
+                dir
+            },
+            Err(e) => {
+                eprintln!("[SQL History] 错误: 获取应用数据目录失败: {}", e);
+                return Err(e.to_string());
+            }
+        };
+
+        if let Err(e) = std::fs::create_dir_all(&app_dir) {
+            eprintln!("[SQL History] 错误: 创建目录失败: {}", e);
+        }
+
         let history_file = app_dir.join("sql_history.json");
+        println!("[SQL History] 历史文件路径: {:?}", history_file);
+
         let mut items: Vec<SqlHistoryItem> = if history_file.exists() {
+            println!("[SQL History] 历史文件存在, 正在读取...");
             let json_str = std::fs::read_to_string(&history_file).unwrap_or_default();
-            serde_json::from_str(&json_str).unwrap_or_default()
+            serde_json::from_str(&json_str).unwrap_or_else(|e| {
+                eprintln!("[SQL History] 警告: 解析历史文件失败: {}, 将创建新历史.", e);
+                Vec::new()
+            })
         } else {
+            println!("[SQL History] 历史文件不存在, 创建新列表.");
             Vec::new()
         };
+
         let hash = generate_hash(content);
         if !items.iter().any(|item| item.hash == hash) {
+            println!("[SQL History] 新的 SQL, 准备插入记录.");
             items.insert(0, SqlHistoryItem {
                 sql: content.to_string(),
                 formatted_sql: formatted.clone(),
@@ -171,10 +194,24 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
                 hash,
             });
             if items.len() > 20 { items.truncate(20); }
-            let json_history = SqlHistory { items: items.clone() };
-            let json_str = serde_json::to_string_pretty(&json_history).unwrap();
-            std::fs::write(&history_file, json_str).ok();
+            
+            // 直接序列化 Vec<SqlHistoryItem>
+            match serde_json::to_string_pretty(&items) {
+                Ok(json_str) => {
+                    if let Err(e) = std::fs::write(&history_file, json_str) {
+                        eprintln!("[SQL History] 错误: 写入历史文件失败: {}", e);
+                    } else {
+                        println!("[SQL History] 历史记录写入成功.");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("[SQL History] 错误: 序列化历史记录失败: {}", e);
+                }
+            }
+        } else {
+            println!("[SQL History] SQL 已存在于历史中, 跳过保存.");
         }
+
         println!("[Clipboard] SQL 格式化完成并已写入剪贴板.");
         app.emit("process-clipboard-done", "SQL已格式化并写入剪贴板").ok();
         return Ok("SQL已格式化并写入剪贴板".to_string());
@@ -343,6 +380,44 @@ async fn clear_parse_records(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn load_sql_history(app_handle: tauri::AppHandle) -> Result<Vec<SqlHistoryItem>, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let history_file = app_dir.join("sql_history.json");
+
+    if !history_file.exists() {
+        return Ok(Vec::new());
+    }
+
+    let json_str = std::fs::read_to_string(history_file).map_err(|e| e.to_string())?;
+    
+    serde_json::from_str(&json_str).map_err(|e| {
+        eprintln!("[SQL History] 读取错误: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn save_sql_history(app: tauri::AppHandle, history: Vec<SqlHistoryItem>) -> Result<(), String> {
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let history_file = app_dir.join("sql_history.json");
+
+    if let Err(e) = std::fs::create_dir_all(&app_dir) {
+        eprintln!("[SQL History] 错误: 创建目录失败: {}", e);
+        return Err(e.to_string());
+    }
+
+    let json_str = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+    
+    if let Err(e) = std::fs::write(&history_file, json_str) {
+        eprintln!("[SQL History] 错误: 写入历史文件失败: {}", e);
+        return Err(e.to_string());
+    } else {
+        println!("[SQL History] 历史记录写入成功.");
+        Ok(())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -371,6 +446,8 @@ pub fn run() {
             get_parse_records,
             delete_parse_record,
             clear_parse_records,
+            save_sql_history,
+            load_sql_history,
         ])
         .setup(|app| {
             #[cfg(desktop)]
