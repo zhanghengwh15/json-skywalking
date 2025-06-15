@@ -131,11 +131,11 @@
                   @click.stop="toggleRecordSelection(record.id)"
                   class="record-checkbox"
                 />
-                <div class="history-item-title">
-                  <span class="history-method" :class="record.request_type.toLowerCase()">
-                    {{ record.request_type }}
-                  </span>
-                  <span class="history-title">{{ record.title }}</span>
+              <div class="history-item-title">
+                <span class="history-method" :class="record.request_type.toLowerCase()">
+                  {{ record.request_type }}
+                </span>
+                <span class="history-title">{{ record.title }}</span>
                 </div>
               </div>
               <div class="history-item-actions">

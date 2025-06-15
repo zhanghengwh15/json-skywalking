@@ -1,10 +1,9 @@
 .json-parser {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   background: #1e1e1e;
   color: #d4d4d4;
 }
@@ -28,8 +27,9 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: auto;
 }
 
 .input-section,

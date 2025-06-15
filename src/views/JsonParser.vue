@@ -560,8 +560,8 @@ function restoreState() {
         inputJson.value = state.inputJson || ''
         selectedKeyPath.value = state.selectedKeyPath || []
         historyList.value = state.historyList || []
-        error.value = ''
-        
+  error.value = ''
+  
         console.log('JsonParser: 状态已恢复')
         if (parsedJson.value) {
           showClipboardStatus('info', '✨ 已恢复之前的JSON解析状态')
@@ -638,9 +638,9 @@ const setupGlobalShortcutListeners = async () => {
         // 添加到历史记录（这里会自动调用saveHistoryToFile）
         addToHistory(parsed)
         showClipboardStatus('success', '🌍 全局快捷键检测到JSON格式，已自动解析')
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : '无效的JSON格式'
-        parsedJson.value = null
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '无效的JSON格式'
+    parsedJson.value = null
         showClipboardStatus('error', '🌍 全局快捷键: JSON解析失败')
       }
     })
@@ -674,7 +674,7 @@ const getClipboardContent = async () => {
         const parsed = JSON.parse(clipboardText)
         parsedJson.value = parsed
         inputJson.value = clipboardText
-        error.value = ''
+  error.value = ''
         // 添加到历史记录（这里会自动调用saveHistoryToFile）
         addToHistory(parsed)
         showClipboardStatus('success', '检测到JSON格式，已自动解析')
@@ -789,6 +789,11 @@ onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
   // 设置全局快捷键事件监听器
   setupGlobalShortcutListeners()
+  // 监听 Option+Shift+F/Alt+Shift+F 后端处理事件
+  listen('process-clipboard-done', (event) => {
+    const msg = event.payload as string
+    showClipboardStatus('info', msg)
+  })
 })
 
 // 组件激活时（用于keep-alive情况）
@@ -841,67 +846,5 @@ function loadFromHistory(item: HistoryItem) {
 </script>
 
 <style scoped>
-.json-parser {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  overflow: hidden;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 20px;
-  flex-shrink: 0;
-  padding: 0 20px;
-}
-
-.content {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.input-section,
-.output-section {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #3c3c3c;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #252526;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: #2d2d30;
-  color: #cccccc;
-  border-bottom: 1px solid #3c3c3c;
-  flex-shrink: 0;
-}
-
-.json-tree-container {
-  flex: 1;
-  overflow: auto;
-  padding: 20px;
-  min-height: 0;
-}
+/**** 只保留结构相关样式，布局交给全局和 assets 样式文件 ****/
 </style> 

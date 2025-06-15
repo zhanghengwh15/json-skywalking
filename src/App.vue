@@ -5,10 +5,6 @@
 <template>
   <div id="app">
     <nav class="tab-navigation">
-      <router-link to="/" class="tab-item">
-        <span class="tab-icon">🏠</span>
-        <span class="tab-text">首页</span>
-      </router-link>
       <router-link to="/json-parser" class="tab-item">
         <span class="tab-icon">🔧</span>
         <span class="tab-text">JSON解析</span>
@@ -29,11 +25,36 @@
 </template>
 
 <style>
-html, body, #app {
+html, body, #app, .main-content {
   height: 100%;
   min-height: 0;
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
+}
+
+/* 全局 box-sizing 和 margin/padding reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.main-content {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* 兼容所有页面根容器（如 .json-parser） */
+.json-parser {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-navigation {
@@ -78,15 +99,6 @@ html, body, #app {
 
 .tab-text {
   font-size: 14px;
-}
-
-.main-content {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  /* 不设置overflow，交由子页面决定 */
 }
 
 /* 添加全局样式 */

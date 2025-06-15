@@ -1,25 +1,25 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
-  "version": "0.1.0",
-  "identifier": "com.tauri-app.app",
+  "$schema": "https://schema.tauri.app/v2",
+  "identifier": "com.tauri.devtools",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "tauri-app",
-        "width": 800,
-        "height": 600
-      }
-    ],
     "security": {
       "csp": null
-    }
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 600,
+        "resizable": true,
+        "title": "Dev Tools",
+        "width": 800
+      }
+    ]
   },
   "bundle": {
     "active": true,
@@ -32,5 +32,21 @@
       "icons/icon.ico"
     ]
   },
-  "plugins": {}
+  "permissions": {
+    "shell": {
+      "all": true
+    },
+    "fs": {
+      "scope": ["**"]
+    },
+    "clipboard": {
+      "all": true
+    },
+    "global-shortcut": {
+      "all": true
+    },
+    "store": {
+      "all": true
+    }
+  }
 }
