@@ -68,13 +68,20 @@ async fn global_clipboard_shortcut(app: tauri::AppHandle) -> Result<String, Stri
 
 #[tauri::command]
 async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, String> {
+    println!("[Clipboard] 开始处理剪贴板内容...");
     // 读取剪贴板
     let clipboard_text = match Clipboard::new() {
         Ok(mut clipboard) => clipboard.get_text().unwrap_or_default(),
-        Err(_) => return Err("无法读取剪贴板内容".to_string()),
+        Err(e) => {
+            eprintln!("[Clipboard] 错误: 无法创建剪贴板实例: {}", e);
+            return Err("无法读取剪贴板内容".to_string());
+        }
     };
     let content = clipboard_text.trim();
+    println!("[Clipboard] 获取到的内容:\n---\n{}\n---", content);
+
     if content.is_empty() {
+        println!("[Clipboard] 内容为空, 终止处理.");
         app.emit("process-clipboard-done", "剪贴板内容为空").ok();
         return Err("剪贴板内容为空".to_string());
     }
@@ -83,7 +90,10 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
     let is_http = content.starts_with("GET ") || content.starts_with("POST ") || content.contains("http://") || content.contains("https://") || content.contains("http.body:");
     let is_sql = content.to_uppercase().contains("SELECT") || content.to_uppercase().contains("INSERT") || content.to_uppercase().contains("UPDATE") || content.to_uppercase().contains("DELETE") || content.contains("db.sql.parameters:");
 
+    println!("[Clipboard] 类型判断: is_http={}, is_sql={}", is_http, is_sql);
+
     if is_http {
+        println!("[Clipboard] 判断为 HTTP 请求.");
         // 简单判断是否已格式化（包含 curl 或多行参数）
         if content.contains("curl -X") {
             app.emit("process-clipboard-done", "HTTP请求已格式化，无需处理").ok();
@@ -129,11 +139,14 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
         app.emit("process-clipboard-done", "HTTP请求已格式化并写入剪贴板").ok();
         return Ok("HTTP请求已格式化并写入剪贴板".to_string());
     } else if is_sql {
+        println!("[Clipboard] 判断为 SQL 请求.");
         // 简单判断是否已格式化（多行缩进/关键字）
         if content.contains("\nSELECT") || content.contains("\nFROM") {
+            println!("[Clipboard] SQL 已被格式化, 跳过处理.");
             app.emit("process-clipboard-done", "SQL已格式化，无需处理").ok();
             return Ok("SQL已格式化，无需处理".to_string());
         }
+        println!("[Clipboard] 准备格式化 SQL...");
         // 格式化 SQL
         let formatted = format_sql_string(content);
         // 写回剪贴板
@@ -163,9 +176,11 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
             let json_str = serde_json::to_string_pretty(&json_history).unwrap();
             std::fs::write(&history_file, json_str).ok();
         }
+        println!("[Clipboard] SQL 格式化完成并已写入剪贴板.");
         app.emit("process-clipboard-done", "SQL已格式化并写入剪贴板").ok();
         return Ok("SQL已格式化并写入剪贴板".to_string());
     } else {
+        println!("[Clipboard] 未能识别为 HTTP 或 SQL.");
         app.emit("process-clipboard-done", "未识别为HTTP或SQL").ok();
         return Err("未识别为HTTP或SQL".to_string());
     }
