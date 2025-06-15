@@ -4,7 +4,6 @@ use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use tauri_plugin_store::StoreExt;
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParseRecord {
@@ -140,8 +139,8 @@ async fn process_clipboard_content(app: tauri::AppHandle) -> Result<String, Stri
         return Ok("HTTP请求已格式化并写入剪贴板".to_string());
     } else if is_sql {
         println!("[Clipboard] 判断为 SQL 请求.");
-        // 简单判断是否已格式化（多行缩进/关键字）
-        if content.contains("\nSELECT") || content.contains("\nFROM") {
+        // 只有当SQL看起来已格式化(包含换行符)，并且不包含参数部分时，才跳过处理
+        if content.contains('\n') && !content.contains("db.sql.parameters:") {
             println!("[Clipboard] SQL 已被格式化, 跳过处理.");
             app.emit("process-clipboard-done", "SQL已格式化，无需处理").ok();
             return Ok("SQL已格式化，无需处理".to_string());
@@ -206,8 +205,45 @@ fn generate_hash(sql: &str) -> String {
     format!("{:x}", hash.abs())
 }
 
-fn format_sql_string(sql: &str) -> String {
-    let mut formatted = sql.replace("SELECT", "\nSELECT")
+fn format_sql_string(sql_with_params: &str) -> String {
+    let mut sql_statement = sql_with_params;
+    let mut params: Vec<String> = Vec::new();
+
+    // 分离 SQL 语句和参数
+    if let Some(index) = sql_with_params.find("db.sql.parameters:") {
+        let (stmt, params_str_with_prefix) = sql_with_params.split_at(index);
+        sql_statement = stmt.trim();
+        // 先 replace，再 trim，并用 let 绑定以延长生命周期
+        let params_part = params_str_with_prefix.replace("db.sql.parameters:", "");
+        let params_str = params_part.trim();
+        
+        // 简单解析参数
+        if params_str.starts_with('[') && params_str.ends_with(']') {
+            let inner_params = &params_str[1..params_str.len()-1];
+            params = inner_params.split(',')
+                .map(|p| p.trim().to_string())
+                .collect();
+        }
+    }
+
+    let mut final_sql = sql_statement.to_string();
+    
+    // 用实际参数替换 '?' 占位符
+    for param in params {
+        let is_numeric = param.parse::<f64>().is_ok();
+        let is_string_literal = (param.starts_with('\'') && param.ends_with('\'')) || (param.starts_with('"') && param.ends_with('"'));
+        
+        let replacement = if is_numeric || is_string_literal {
+            param
+        } else {
+            // 为非数字、非字面量字符串添加引号
+            format!("'{}'", param)
+        };
+        final_sql = final_sql.replacen('?', &replacement, 1);
+    }
+
+    // 格式化 SQL 关键字
+    final_sql = final_sql.replace("SELECT", "\nSELECT")
         .replace("FROM", "\nFROM")
         .replace("WHERE", "\nWHERE")
         .replace("AND", "\n  AND")
@@ -220,8 +256,12 @@ fn format_sql_string(sql: &str) -> String {
         .replace("LEFT JOIN", "\nLEFT JOIN")
         .replace("RIGHT JOIN", "\nRIGHT JOIN")
         .replace("INNER JOIN", "\nINNER JOIN");
-    if formatted.starts_with("\n") { formatted = formatted[1..].to_string(); }
-    formatted
+        
+    if final_sql.starts_with('\n') {
+        final_sql = final_sql[1..].to_string();
+    }
+    
+    final_sql.trim().to_string()
 }
 
 #[tauri::command]
