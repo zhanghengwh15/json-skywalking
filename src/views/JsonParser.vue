@@ -544,40 +544,6 @@ function formatTime(timestamp: number): string {
   }
 }
 
-// 恢复状态从localStorage
-function restoreState() {
-  try {
-    const savedState = localStorage.getItem('jsonParserState')
-    if (savedState) {
-      const state = JSON.parse(savedState)
-      
-      // 检查状态是否过期（30分钟）
-      const now = Date.now()
-      const thirtyMinutes = 30 * 60 * 1000
-      
-      if (now - state.timestamp < thirtyMinutes) {
-        parsedJson.value = state.parsedJson || null
-        inputJson.value = state.inputJson || ''
-        selectedKeyPath.value = state.selectedKeyPath || []
-        historyList.value = state.historyList || []
-  error.value = ''
-  
-        console.log('JsonParser: 状态已恢复')
-        if (parsedJson.value) {
-          showClipboardStatus('info', '✨ 已恢复之前的JSON解析状态')
-        }
-      } else {
-        // 状态过期，清除
-        localStorage.removeItem('jsonParserState')
-        console.log('JsonParser: 状态已过期，已清除')
-      }
-    }
-  } catch (err) {
-    console.error('JsonParser: 恢复状态失败:', err)
-    localStorage.removeItem('jsonParserState')
-  }
-}
-
 // 检查是否有从PostParser跳转过来的临时JSON数据
 function checkTempJsonData() {
   try {
