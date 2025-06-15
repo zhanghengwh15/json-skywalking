@@ -299,7 +299,18 @@ async fn clear_parse_records(app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|_app, _shortcut, _event| {
+                    let handle = _app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = process_clipboard_content(handle).await {
+                            eprintln!("Error processing clipboard: {}", e);
+                        }
+                    });
+                })
+                .build()
+        )
         .invoke_handler(tauri::generate_handler![
             greet,
             get_clipboard,
@@ -311,24 +322,13 @@ pub fn run() {
             clear_parse_records,
         ])
         .setup(|app| {
-            // 注册全局快捷键
-            #[cfg(target_os = "macos")]
-            let shortcut = "Option+Shift+F";
-            #[cfg(not(target_os = "macos"))]
-            let shortcut = "Alt+Shift+F";
-            
-            match app.global_shortcut().register(shortcut, move |_app| {
-                let app_handle = _app.handle();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = process_clipboard_content(app_handle).await {
-                        eprintln!("Error processing clipboard: {}", e);
-                    }
-                });
-            }) {
-                Ok(_) => println!("Global shortcut registered successfully"),
-                Err(e) => eprintln!("Failed to register global shortcut: {}", e),
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
+                let shortcut = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyF);
+                app.global_shortcut().register(shortcut)?;
+                println!("Global shortcut registered successfully");
             }
-            
             Ok(())
         })
         .run(tauri::generate_context!())

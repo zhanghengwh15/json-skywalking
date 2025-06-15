@@ -31,22 +31,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "permissions": {
-    "shell": {
-      "all": true
-    },
-    "fs": {
-      "scope": ["**"]
-    },
-    "clipboard": {
-      "all": true
-    },
-    "global-shortcut": {
-      "all": true
-    },
-    "store": {
-      "all": true
-    }
   }
 }

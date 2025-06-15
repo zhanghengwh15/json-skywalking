@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::fs;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use arboard::Clipboard;
@@ -124,6 +123,8 @@ fn load_sql_history(app_handle: tauri::AppHandle) -> Result<Vec<SqlHistoryItem>,
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_clipboard,
             save_json_history,

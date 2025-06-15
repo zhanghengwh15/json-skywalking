@@ -1,11 +1,12 @@
 [package]
 name = "dev-tools"
-version = "1.0.0"
-description = "dev tools"
-authors = ["zhangheng"]
+version = "0.0.0"
+description = "A Tauri App"
+authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
+rust-version = "1.57"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,14 +18,14 @@ name = "tauri_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.2.0", features = [] }
+tauri-build = { version = "2.0.0-beta", features = [] }
 
 [dependencies]
-tauri = { version = "2.2.0", features = [] }
-serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri-plugin-store = "2.2.0"
-tauri-plugin-global-shortcut = "2.2.1"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2.0.0-beta", features = [] }
+tauri-plugin-store = { version = "2.0.0-beta", features = [] }
+tauri-plugin-global-shortcut = { version = "2.0.0-beta", features = [] }
 arboard = "3.3.0"
 rand = "0.8.5"
 chrono = "0.4.34"
@@ -33,4 +34,7 @@ chrono = "0.4.34"
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[build]
+path = "build.rs"
 
