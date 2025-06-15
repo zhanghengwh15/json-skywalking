@@ -163,7 +163,7 @@ pub fn run() {
                 });
             }) {
                 Ok(_) => {
-                    println!("Global shortcut registered: {}", shortcut);
+            println!("Global shortcut registered: {}", shortcut);
                 },
                 Err(e) => {
                     eprintln!("Warning: Failed to register global shortcut '{}': {}. The application will continue running without global shortcuts.", shortcut, e);

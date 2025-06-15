@@ -484,16 +484,18 @@ onUnmounted(() => {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
-  height: calc(100vh - 80px);
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: #1e1e1e;
   color: #d4d4d4;
+  overflow: hidden; /* 防止整体滚动 */
 }
 
 .header {
   text-align: center;
   margin-bottom: 20px;
+  flex-shrink: 0; /* 防止头部被压缩 */
 }
 
 .header h1 {
@@ -511,7 +513,8 @@ onUnmounted(() => {
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   flex: 1;
-  min-height: 0;
+  min-height: 0; /* 重要：允许内容区域收缩 */
+  overflow: hidden; /* 防止内容区域滚动 */
 }
 
 .input-section,
@@ -522,6 +525,7 @@ onUnmounted(() => {
   border-radius: 8px;
   overflow: hidden;
   background: #252526;
+  min-height: 0; /* 重要：允许section收缩 */
 }
 
 .section-header {
@@ -594,13 +598,14 @@ onUnmounted(() => {
   resize: none;
   background: #1e1e1e;
   color: #d4d4d4;
+  overflow: auto; /* 只在输入区域显示滚动条 */
 }
 
 .sql-output {
   flex: 1;
   padding: 20px;
   background: #1e1e1e;
-  overflow: auto;
+  overflow: auto; /* 只在输出区域显示滚动条 */
   color: #d4d4d4;
 }
 

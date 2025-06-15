@@ -670,12 +670,6 @@ const viewJson = async () => {
   }
 }
 
-
-
-
-
-
-
 // 生成唯一ID
 const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2)
@@ -916,3 +910,65 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
 </script> 
+
+<style scoped>
+.post-parser {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  overflow: hidden; /* 防止整体滚动 */
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+  flex-shrink: 0; /* 防止头部被压缩 */
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex: 1;
+  min-height: 0; /* 重要：允许内容区域收缩 */
+  overflow: hidden; /* 防止内容区域滚动 */
+}
+
+.input-section,
+.output-section {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #252526;
+  min-height: 0; /* 重要：允许section收缩 */
+}
+
+.post-input {
+  flex: 1;
+  padding: 20px;
+  border: none;
+  outline: none;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  overflow: auto; /* 只在输入区域显示滚动条 */
+}
+
+.post-output {
+  flex: 1;
+  padding: 20px;
+  background: #1e1e1e;
+  overflow: auto; /* 只在输出区域显示滚动条 */
+  color: #d4d4d4;
+}
+</style> 

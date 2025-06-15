@@ -841,5 +841,47 @@ function loadFromHistory(item: HistoryItem) {
 </script>
 
 <style scoped>
-/* 移除所有内联样式，因为已经移到外部CSS文件中 */
+.json-parser {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  overflow: hidden; /* 防止整体滚动 */
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+  flex-shrink: 0; /* 防止头部被压缩 */
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex: 1;
+  min-height: 0; /* 重要：允许内容区域收缩 */
+  overflow: hidden; /* 防止内容区域滚动 */
+}
+
+.input-section,
+.output-section {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #252526;
+  min-height: 0; /* 重要：允许section收缩 */
+}
+
+.json-tree-container {
+  flex: 1;
+  overflow: auto; /* 只在内容区域显示滚动条 */
+  padding: 20px;
+}
 </style> 

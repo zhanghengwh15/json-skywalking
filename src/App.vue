@@ -37,6 +37,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* 防止整体出现滚动条 */
 }
 
 .tab-navigation {
@@ -44,6 +45,7 @@
   padding: 0;
   display: flex;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  flex-shrink: 0; /* 防止导航栏被压缩 */
 }
 
 .tab-item {
@@ -81,8 +83,9 @@
 
 .main-content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden; /* 改为 hidden，让子组件自己处理滚动 */
   background-color: #f8f9fa;
+  position: relative; /* 为绝对定位的子元素提供参考 */
 }
 
 /* 响应式设计 */
