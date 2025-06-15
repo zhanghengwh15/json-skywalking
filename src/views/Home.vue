@@ -107,10 +107,14 @@ const navigateToSqlParser = () => {
 
 <style scoped>
 .home {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
-  min-height: calc(100vh - 80px);
 }
 
 /* 头部英雄区域 */

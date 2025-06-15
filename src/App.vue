@@ -29,15 +29,11 @@
 </template>
 
 <style>
-#app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* 防止整体出现滚动条 */
+html, body, #app {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .tab-navigation {
@@ -45,7 +41,8 @@
   padding: 0;
   display: flex;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  flex-shrink: 0; /* 防止导航栏被压缩 */
+  flex-shrink: 0;
+  z-index: 10;
 }
 
 .tab-item {
@@ -60,6 +57,8 @@
   flex: 1;
   justify-content: center;
   gap: 8px;
+  height: 60px;
+  box-sizing: border-box;
 }
 
 .tab-item:hover {
@@ -83,9 +82,16 @@
 
 .main-content {
   flex: 1;
-  overflow: hidden; /* 改为 hidden，让子组件自己处理滚动 */
-  background-color: #f8f9fa;
-  position: relative; /* 为绝对定位的子元素提供参考 */
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* 不设置overflow，交由子页面决定 */
+}
+
+/* 添加全局样式 */
+html, body {
+  overflow: hidden;
 }
 
 /* 响应式设计 */

@@ -481,21 +481,25 @@ onUnmounted(() => {
 
 <style scoped>
 .sql-parser {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: #1e1e1e;
   color: #d4d4d4;
-  overflow: hidden; /* 防止整体滚动 */
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .header {
   text-align: center;
   margin-bottom: 20px;
-  flex-shrink: 0; /* 防止头部被压缩 */
+  flex-shrink: 0;
+  padding: 0 20px;
 }
 
 .header h1 {
@@ -509,23 +513,27 @@ onUnmounted(() => {
 }
 
 .content {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  flex: 1;
-  min-height: 0; /* 重要：允许内容区域收缩 */
-  overflow: hidden; /* 防止内容区域滚动 */
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .input-section,
 .output-section {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   border: 1px solid #3c3c3c;
   border-radius: 8px;
   overflow: hidden;
   background: #252526;
-  min-height: 0; /* 重要：允许section收缩 */
 }
 
 .section-header {
@@ -536,6 +544,7 @@ onUnmounted(() => {
   background: #2d2d30;
   color: #cccccc;
   border-bottom: 1px solid #3c3c3c;
+  flex-shrink: 0;
 }
 
 .section-header h3 {
@@ -598,15 +607,17 @@ onUnmounted(() => {
   resize: none;
   background: #1e1e1e;
   color: #d4d4d4;
-  overflow: auto; /* 只在输入区域显示滚动条 */
+  overflow: auto;
+  min-height: 0;
 }
 
 .sql-output {
   flex: 1;
   padding: 20px;
   background: #1e1e1e;
-  overflow: auto; /* 只在输出区域显示滚动条 */
+  overflow: auto;
   color: #d4d4d4;
+  min-height: 0;
 }
 
 .sql-display pre {
