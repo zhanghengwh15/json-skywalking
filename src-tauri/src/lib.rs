@@ -33,6 +33,13 @@ struct SqlHistory {
     items: Vec<SqlHistoryItem>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct JsonHistoryItem {
+    data: serde_json::Value,
+    timestamp: i64,
+    hash: String,
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -313,23 +320,23 @@ async fn save_parse_record(
     let store = app.store("parse_history.json")
         .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    // 获取现有记录
-    let mut records: Vec<ParseRecord> = store
-        .get("records")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-    
-    // 添加新记录到开头
-    records.insert(0, record);
-    
-    // 限制最多保存100条记录
-    if records.len() > 100 {
-        records.truncate(100);
-    }
-    
-    // 保存更新后的记录
+        // 获取现有记录
+        let mut records: Vec<ParseRecord> = store
+            .get("records")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        
+        // 添加新记录到开头
+        records.insert(0, record);
+        
+        // 限制最多保存100条记录
+        if records.len() > 100 {
+            records.truncate(100);
+        }
+        
+        // 保存更新后的记录
     store.set("records".to_string(), serde_json::to_value(&records).unwrap());
-    store.save()
+        store.save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
     
     Ok(())
@@ -340,12 +347,12 @@ async fn get_parse_records(app: tauri::AppHandle) -> Result<Vec<ParseRecord>, St
     let store = app.store("parse_history.json")
         .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let records: Vec<ParseRecord> = store
-        .get("records")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+        let records: Vec<ParseRecord> = store
+            .get("records")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
     
-    Ok(records)
+        Ok(records)
 }
 
 #[tauri::command]
@@ -356,17 +363,17 @@ async fn delete_parse_record(
     let store = app.store("parse_history.json")
         .map_err(|e| format!("Failed to access store: {}", e))?;
     
-    let mut records: Vec<ParseRecord> = store
-        .get("records")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-    
-    // 删除指定ID的记录
-    records.retain(|r| r.id != record_id);
-    
-    // 保存更新后的记录
+        let mut records: Vec<ParseRecord> = store
+            .get("records")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        
+        // 删除指定ID的记录
+        records.retain(|r| r.id != record_id);
+        
+        // 保存更新后的记录
     store.set("records".to_string(), serde_json::to_value(&records).unwrap());
-    store.save()
+        store.save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
     
     Ok(())
@@ -422,6 +429,40 @@ async fn save_sql_history(app: tauri::AppHandle, history: Vec<SqlHistoryItem>) -
     }
 }
 
+#[tauri::command]
+fn load_json_history(app_handle: tauri::AppHandle) -> Result<Vec<JsonHistoryItem>, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let history_file = app_dir.join("json_parser_history.json");
+
+    if !history_file.exists() {
+        return Ok(Vec::new());
+    }
+
+    let json_str = std::fs::read_to_string(history_file).map_err(|e| e.to_string())?;
+    
+    if json_str.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    serde_json::from_str(&json_str).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_json_history(
+    app: tauri::AppHandle,
+    history: Vec<JsonHistoryItem>,
+) -> Result<(), String> {
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    if !app_dir.exists() {
+        std::fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
+    }
+    let history_file = app_dir.join("json_parser_history.json");
+
+    let json_str = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+
+    std::fs::write(history_file, json_str).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -446,12 +487,17 @@ pub fn run() {
             get_clipboard,
             global_clipboard_shortcut,
             process_clipboard_content,
+            // post history
             save_parse_record,
             get_parse_records,
             delete_parse_record,
             clear_parse_records,
-            save_sql_history,
+            // sql history
             load_sql_history,
+            save_sql_history,
+            // json history
+            load_json_history,
+            save_json_history
         ])
         .on_window_event(|window, event| match event {
             WindowEvent::CloseRequested { api, .. } => {
@@ -540,7 +586,7 @@ pub fn run() {
                     if let Some(window) = _app_handle.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
-                    }
+}
                 }
                 _ => {}
             }

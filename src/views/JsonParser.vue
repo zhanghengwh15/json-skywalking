@@ -669,6 +669,12 @@ const showClipboardStatus = (type: 'success' | 'error' | 'info', message: string
 
 // 自动检查剪贴板（页面加载时）
 const autoCheckClipboard = async () => {
+  // 如果当前已有解析的JSON，则不执行自动检查，避免覆盖用户正在查看的内容
+  if (parsedJson.value) {
+    console.log('JsonParser: 已有JSON数据，跳过自动剪贴板检查。');
+    return;
+  }
+
   try {
     const clipboardText = await invoke<string>('get_clipboard')
     
@@ -747,6 +753,8 @@ const handleKeydown = (event: KeyboardEvent) => {
 onMounted(async () => {
   // 从文件加载历史记录
   await loadHistoryFromFile()
+  // 恢复上一次的查看状态
+  loadCurrentState()
   // 检查是否有从PostParser跳转过来的临时JSON数据
   checkTempJsonData()
   // 页面加载时自动检查剪贴板
@@ -763,13 +771,19 @@ onMounted(async () => {
 })
 
 // 组件激活时（用于keep-alive情况）
-onActivated(() => {
+onActivated(async () => {
+  // 从文件加载最新的历史记录
+  await loadHistoryFromFile();
+  // 恢复上一次的查看状态
+  loadCurrentState();
+  // 检查是否有从PostParser跳转过来的临时JSON数据
+  checkTempJsonData();
   // 组件激活时也检查剪贴板
-  autoCheckClipboard()
+  autoCheckClipboard();
   // 确保键盘事件监听器存在
-  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('keydown', handleKeydown);
   // 重新设置全局快捷键事件监听器
-  setupGlobalShortcutListeners()
+  setupGlobalShortcutListeners();
 })
 
 // 组件卸载时移除事件监听器
@@ -793,6 +807,28 @@ function saveCurrentState() {
     }
     localStorage.setItem('jsonParserState', JSON.stringify(currentState))
     console.log('JsonParser: 状态已保存')
+  }
+}
+
+// 恢复当前状态从localStorage
+function loadCurrentState() {
+  try {
+    const savedStateJSON = localStorage.getItem('jsonParserState');
+    if (savedStateJSON) {
+      const savedState = JSON.parse(savedStateJSON);
+      
+      // 只有当有有效数据时才恢复
+      if (savedState.parsedJson) {
+        parsedJson.value = savedState.parsedJson;
+        inputJson.value = savedState.inputJson;
+        selectedKeyPath.value = savedState.selectedKeyPath || [];
+        console.log('JsonParser: 状态已从localStorage恢复');
+      }
+    }
+  } catch (err) {
+    console.error('JsonParser: 从localStorage恢复状态失败:', err);
+    // 清除可能损坏的状态
+    localStorage.removeItem('jsonParserState');
   }
 }
 
