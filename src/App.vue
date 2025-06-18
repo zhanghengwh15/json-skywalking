@@ -40,8 +40,14 @@ html, body, #app, .main-content {
   padding: 0;
 }
 
+/* 让 #app 使用 flex 布局 */
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
 .main-content {
-  height: 100%;
+  height: auto;
   min-height: 0;
   flex: 1 1 auto;
   display: flex;
@@ -103,7 +109,7 @@ html, body, #app, .main-content {
 
 /* 添加全局样式 */
 html, body {
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* 响应式设计 */
