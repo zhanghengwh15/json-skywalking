@@ -49,8 +49,9 @@
         <div class="section-header">
           <h3>值内容</h3>
           <div class="actions">
-            <button @click="copySelectedValue" :disabled="!parsedJson" class="copy-btn">
+            <button @click="copySelectedValue" :disabled="!parsedJson" class="copy-btn" title="复制选中节点的值 (⌘C / Ctrl+C)">
               复制值
+              <span class="shortcut-hint">⌘C</span>
             </button>
             <button @click="toggleHistory" class="history-btn">
               历史记录 ({{ historyList.length }})
@@ -723,29 +724,41 @@ const handleKeydown = (event: KeyboardEvent) => {
   const isModifierPressed = isMac ? event.metaKey : event.ctrlKey
   
   // Command+Shift+G (Mac) 或 Ctrl+Shift+G (Windows/Linux) - 全局快捷键备用
+  // 这个快捷键应该总是可用，无论焦点在哪里
   if (isModifierPressed && event.shiftKey && event.key.toLowerCase() === 'g') {
     event.preventDefault()
     event.stopPropagation()
     getClipboardContent()
     return
   }
+
+  // 检查当前焦点是否在输入框或文本区域
+  const activeElement = document.activeElement as HTMLElement
+  const isInputFocused = activeElement && (
+    activeElement.tagName === 'INPUT' ||
+    activeElement.tagName === 'TEXTAREA' ||
+    (activeElement as any).contentEditable === 'true'
+  )
+
+  // 如果焦点在输入框中，则不执行下面的自定义快捷键
+  if (isInputFocused) {
+    return
+  }
   
   // Command+V (Mac) 或 Ctrl+V (Windows/Linux) - 传统粘贴快捷键
-  if (isModifierPressed && event.key.toLowerCase() === 'v') {
-    // 检查当前焦点是否在输入框或文本区域
-    const activeElement = document.activeElement as HTMLElement
-    const isInputFocused = activeElement && (
-      activeElement.tagName === 'INPUT' || 
-      activeElement.tagName === 'TEXTAREA' || 
-      (activeElement as any).contentEditable === 'true'
-    )
-    
+  if (isModifierPressed && !event.shiftKey && event.key.toLowerCase() === 'v') {
     // 如果没有焦点在输入框上，则拦截粘贴事件并处理JSON
-    if (!isInputFocused) {
-      event.preventDefault()
-      event.stopPropagation()
-      getClipboardContent()
-    }
+    event.preventDefault()
+    event.stopPropagation()
+    getClipboardContent()
+  }
+
+  // Command+C (Mac) 或 Ctrl+C (Windows/Linux) - 复制选中值
+  if (isModifierPressed && !event.shiftKey && event.key.toLowerCase() === 'c') {
+    // 如果没有焦点在输入框上，则拦截复制事件并执行自定义复制
+    event.preventDefault()
+    event.stopPropagation()
+    copySelectedValue()
   }
 }
 
