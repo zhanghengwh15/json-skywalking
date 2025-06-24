@@ -12,9 +12,9 @@ const routes = [
     component: () => import('../views/SqlParser.vue')
   },
   {
-    path: '/post-parser',
-    name: 'PostParser',
-    component: () => import('../views/PostParser.vue')
+    path: '/http-parser',
+    name: 'HttpParser',
+    component: () => import('../views/HttpParser.vue')
   },
   {
     path: '/:catchAll(.*)',

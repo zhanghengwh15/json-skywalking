@@ -14,12 +14,18 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 800,
+        "height": 900,
         "resizable": true,
         "title": "Dev Tools",
-        "width": 1000,
-        "minWidth": 1000,
-        "minHeight": 800
+        "width": 1600,
+        "minWidth": 1200,
+        "minHeight": 900,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "visible": true
       }
     ]
   },

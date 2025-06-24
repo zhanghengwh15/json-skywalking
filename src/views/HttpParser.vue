@@ -1,5 +1,5 @@
 <template>
-  <div class="post-parser">
+  <div class="http-parser">
     <div class="header">
       <h1>HTTP 请求解析工具</h1>
       <p>支持HTTP请求解析，使用Ctrl+V快速生成curl命令</p>
@@ -22,7 +22,7 @@
         <textarea
           v-model="inputText"
           placeholder="GET请求格式：直接输入完整URL&#10;POST请求格式：URL&#10;http.body: JSON数据"
-          class="post-input"
+          class="http-input"
           @input="resetError"
         ></textarea>
       </div>
@@ -49,7 +49,7 @@
             </button>
           </div>
         </div>
-        <div class="post-output">
+        <div class="http-output">
           <div v-if="error" class="error-message">
             <h4>解析错误：</h4>
             <p>{{ error }}</p>
@@ -178,7 +178,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
-import '../styles/post-parser.css'
+import '../assets/styles/HttpParser.css'
 
 // 定义类型
 interface ParseRecord {
@@ -606,15 +606,15 @@ const saveCurrentState = () => {
       isFormatted: isFormatted.value,
       timestamp: Date.now()
     }
-    localStorage.setItem('postParserState', JSON.stringify(currentState))
-    console.log('PostParser: 状态已保存')
+    localStorage.setItem('httpParserState', JSON.stringify(currentState))
+    console.log('HttpParser: 状态已保存')
   }
 }
 
 // 恢复状态从localStorage
 const restoreState = () => {
   try {
-    const savedState = localStorage.getItem('postParserState')
+    const savedState = localStorage.getItem('httpParserState')
     if (savedState) {
       const state = JSON.parse(savedState)
       
@@ -629,17 +629,17 @@ const restoreState = () => {
         isFormatted.value = state.isFormatted || false
         error.value = ''
         
-        console.log('PostParser: 状态已恢复')
+        console.log('HttpParser: 状态已恢复')
         showToast('info', '✨ 已恢复之前的解析状态', 2000)
     } else {
         // 状态过期，清除
-        localStorage.removeItem('postParserState')
-        console.log('PostParser: 状态已过期，已清除')
+        localStorage.removeItem('httpParserState')
+        console.log('HttpParser: 状态已过期，已清除')
       }
     }
   } catch (err) {
-    console.error('PostParser: 恢复状态失败:', err)
-    localStorage.removeItem('postParserState')
+    console.error('HttpParser: 恢复状态失败:', err)
+    localStorage.removeItem('httpParserState')
   }
 }
 
@@ -913,87 +913,4 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
-</script>
-
-<style scoped>
-.post-parser {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  overflow: hidden;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 20px;
-  flex-shrink: 0;
-  padding: 0 20px;
-}
-
-.content {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.input-section,
-.output-section {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #3c3c3c;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #252526;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: #2d2d30;
-  color: #cccccc;
-  border-bottom: 1px solid #3c3c3c;
-  flex-shrink: 0;
-}
-
-.post-input {
-  flex: 1;
-  padding: 20px;
-  border: none;
-  outline: none;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  resize: none;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  overflow: auto;
-  min-height: 0;
-}
-
-.post-output {
-  flex: 1;
-  padding: 20px;
-  background: #1e1e1e;
-  overflow: auto;
-  color: #d4d4d4;
-  min-height: 0;
-}
-</style> 
+</script> 

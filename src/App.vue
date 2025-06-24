@@ -13,7 +13,7 @@
         <span class="tab-icon">🗃️</span>
         <span class="tab-text">SQL解析</span>
       </router-link>
-      <router-link to="/post-parser" class="tab-item">
+      <router-link to="/http-parser" class="tab-item">
         <span class="tab-icon">🌐</span>
         <span class="tab-text">HTTP解析</span>
       </router-link>
@@ -25,12 +25,20 @@
 </template>
 
 <style>
-html, body, #app, .main-content {
+/* 全局样式 - 确保页面填充整个窗口 */
+html,
+body,
+#app {
   height: 100%;
-  min-height: 0;
+  width: 100%;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  overflow: hidden; /* 防止出现不必要的滚动条 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 全局 box-sizing 和 margin/padding reset */
@@ -107,21 +115,44 @@ html, body, #app, .main-content {
   font-size: 14px;
 }
 
-/* 添加全局样式 */
-html, body {
-  overflow: auto;
+/* 响应式设计 - 针对不同屏幕尺寸的优化 */
+@media (max-width: 1200px) {
+  /* 中等屏幕 */
+  .json-parser {
+    max-width: 100% !important;
+  }
 }
 
-/* 响应式设计 */
-@media (max-width: 480px) {
-  .tab-item {
-    flex-direction: column;
-    padding: 10px 15px;
-    gap: 4px;
+@media (max-width: 768px) {
+  /* 小屏幕 */
+  .content {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
   
-  .tab-text {
-    font-size: 12px;
+  .section-header {
+    padding: 10px 15px !important;
+  }
+  
+  .actions {
+    flex-direction: column !important;
+    gap: 5px !important;
+  }
+}
+
+/* 高分辨率屏幕优化 */
+@media (min-width: 1920px) {
+  /* 4K或更大屏幕 */
+  .json-parser {
+    font-size: 16px;
+  }
+  
+  .json-tree {
+    font-size: 15px;
+  }
+  
+  .section-header h3 {
+    font-size: 18px;
   }
 }
 </style>

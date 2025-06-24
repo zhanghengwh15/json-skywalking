@@ -125,10 +125,60 @@
         <span>复制 Value</span>
         <span class="menu-preview">{{ getValuePreview(contextMenuData?.value) }}</span>
       </div>
+      <div class="context-menu-item" @click="editValue">
+        <span class="menu-icon">✏️</span>
+        <span>编辑 Value</span>
+        <span class="menu-preview">{{ getValuePreview(contextMenuData?.value) }}</span>
+      </div>
     </div>
     
     <!-- 右键菜单遮罩 -->
     <div v-if="showContextMenu" class="context-menu-overlay" @click="closeContextMenu"></div>
+    
+    <!-- 编辑值弹窗 -->
+    <div v-if="showEditDialog" class="edit-dialog-overlay" @click="closeEditDialog">
+      <div class="edit-dialog" @click.stop>
+        <div class="edit-dialog-header">
+          <h3>编辑值</h3>
+          <button @click="closeEditDialog" class="close-btn">✕</button>
+        </div>
+        <div class="edit-dialog-content">
+          <div class="edit-field">
+            <label>键名:</label>
+            <input 
+              v-model="editForm.key" 
+              type="text" 
+              readonly 
+              class="readonly-input"
+            />
+          </div>
+          <div class="edit-field">
+            <label>新值:</label>
+            <textarea 
+              v-model="editForm.value" 
+              placeholder="请输入新的值..."
+              rows="6"
+              class="edit-textarea"
+            ></textarea>
+          </div>
+          <div class="edit-field">
+            <label>值类型:</label>
+            <select v-model="editForm.type" class="edit-select">
+              <option value="string">字符串</option>
+              <option value="number">数字</option>
+              <option value="boolean">布尔值</option>
+              <option value="null">null</option>
+              <option value="object">对象 (JSON)</option>
+              <option value="array">数组 (JSON)</option>
+            </select>
+          </div>
+        </div>
+        <div class="edit-dialog-footer">
+          <button @click="closeEditDialog" class="cancel-btn">取消</button>
+          <button @click="saveEditValue" class="save-btn">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -857,6 +907,121 @@ function loadFromHistory(item: HistoryItem) {
   showHistory.value = false
   showClipboardStatus('success', '已加载历史记录')
   saveCurrentState()
+}
+
+// 编辑值弹窗相关
+const showEditDialog = ref(false)
+const editForm = ref({
+  key: '',
+  value: '',
+  type: 'string'
+})
+
+function closeEditDialog() {
+  showEditDialog.value = false
+}
+
+function saveEditValue() {
+  if (!contextMenuData.value) return
+  try {
+    let newValue: any
+    
+    // 根据选择的类型解析值
+    switch (editForm.value.type) {
+      case 'string':
+        newValue = editForm.value.value
+        break
+      case 'number':
+        newValue = Number(editForm.value.value)
+        if (isNaN(newValue)) {
+          throw new Error('无效的数字格式')
+        }
+        break
+      case 'boolean':
+        if (editForm.value.value.toLowerCase() === 'true') {
+          newValue = true
+        } else if (editForm.value.value.toLowerCase() === 'false') {
+          newValue = false
+        } else {
+          throw new Error('无效的布尔值格式')
+        }
+        break
+      case 'null':
+        if (editForm.value.value.toLowerCase() === 'null') {
+          newValue = null
+        } else {
+          throw new Error('无效的null格式')
+        }
+        break
+      case 'object':
+      case 'array':
+        newValue = JSON.parse(editForm.value.value)
+        break
+      default:
+        newValue = editForm.value.value
+    }
+    
+    // 更新JSON数据中的值
+    updateJsonValue(contextMenuData.value.path, newValue)
+    
+    showClipboardStatus('success', '值已更新！')
+  } catch (err) {
+    showClipboardStatus('error', '更新值失败: ' + (err instanceof Error ? err.message : String(err)))
+  }
+  closeEditDialog()
+}
+
+function editValue() {
+  if (!contextMenuData.value) return
+  
+  // 设置编辑表单的初始值
+  editForm.value.key = contextMenuData.value.key
+  editForm.value.value = typeof contextMenuData.value.value === 'string' 
+    ? contextMenuData.value.value 
+    : JSON.stringify(contextMenuData.value.value, null, 2)
+  
+  // 根据值的类型设置默认类型
+  if (contextMenuData.value.value === null) {
+    editForm.value.type = 'null'
+  } else if (typeof contextMenuData.value.value === 'number') {
+    editForm.value.type = 'number'
+  } else if (typeof contextMenuData.value.value === 'boolean') {
+    editForm.value.type = 'boolean'
+  } else if (Array.isArray(contextMenuData.value.value)) {
+    editForm.value.type = 'array'
+  } else if (typeof contextMenuData.value.value === 'object') {
+    editForm.value.type = 'object'
+  } else {
+    editForm.value.type = 'string'
+  }
+  
+  showEditDialog.value = true
+}
+
+// 更新JSON数据中的值
+function updateJsonValue(path: (string|number)[], newValue: any) {
+  if (!parsedJson.value || !path.length) return
+  
+  let current = parsedJson.value
+  const lastIndex = path.length - 1
+  
+  // 遍历到父节点
+  for (let i = 0; i < lastIndex; i++) {
+    current = current[path[i]]
+    if (current === undefined || current === null) {
+      console.error('路径无效:', path)
+      return
+    }
+  }
+  
+  // 更新值
+  current[path[lastIndex]] = newValue
+  
+  // 更新inputJson以保持同步
+  inputJson.value = JSON.stringify(parsedJson.value, null, 2)
+  
+  // 保存到历史记录
+  addToHistory(parsedJson.value)
 }
 </script>
 

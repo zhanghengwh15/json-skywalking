@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+  /* max-width: 1400px; */
+  margin: 0;
   background: #1e1e1e;
   color: #d4d4d4;
 }
@@ -27,7 +27,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow: auto;
 }
@@ -691,4 +691,70 @@
   .history-sidebar {
     width: 100%;
   }
+}
+
+/* 编辑弹窗样式 */
+.edit-window {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-window-content {
+  background: #252526;
+  border-radius: 8px;
+  padding: 20px;
+  width: 80%;
+  max-width: 600px;
+  position: relative;
+}
+
+.close-edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #cccccc;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-form label {
+  margin-bottom: 10px;
+}
+
+.edit-form input,
+.edit-form textarea {
+  padding: 8px;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  background: #3c3c3c;
+  color: #d4d4d4;
+}
+
+.edit-form button {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.edit-form button:hover {
+  background: #5a6268;
 } 
