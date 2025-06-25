@@ -4,17 +4,17 @@
       <h1>JSON 解析与格式化工具</h1>
       <p>使用快捷键或按钮从剪贴板加载JSON数据</p>
     </div>
-    
     <div class="content">
       <div class="input-section">
         <div class="section-header">
           <h3>JSON 结构视图</h3>
           <div class="actions">
-            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'">
-              获取剪贴板
-              <span class="shortcut-hint">⌘⇧G</span>
-              <span class="global-indicator">🌍</span>
-            </button>
+            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'"><span>获取剪贴板</span><span class="shortcut-hint">⌘⇧G</span><span class="global-indicator">🌍</span></button>
+            <input
+              v-model="searchText"
+              placeholder="搜索 key 或 value..."
+              style="background: #23272f; color: #e0e0e0; border: 1.5px solid #333a45; border-radius: 6px; padding: 6px 12px; font-size: 15px; min-width: 180px; outline: none; margin-left: 12px;"
+            />
           </div>
         </div>
         <div class="json-tree-container">
@@ -22,9 +22,9 @@
             <h4>解析错误：</h4>
             <p>{{ error }}</p>
           </div>
-          <div v-else-if="parsedJson" class="json-tree">
+          <div v-else-if="filteredJson" class="json-tree">
             <JsonTreeNode 
-              :data="parsedJson" 
+              :data="filteredJson" 
               :key-name="'root'" 
               :is-root="true"
               :level="0"
@@ -140,7 +140,6 @@
       <div class="edit-dialog" @click.stop>
         <div class="edit-dialog-header">
           <h3>编辑值</h3>
-          <button @click="closeEditDialog" class="close-btn">✕</button>
         </div>
         <div class="edit-dialog-content">
           <div class="edit-field">
@@ -160,17 +159,6 @@
               rows="6"
               class="edit-textarea"
             ></textarea>
-          </div>
-          <div class="edit-field">
-            <label>值类型:</label>
-            <select v-model="editForm.type" class="edit-select">
-              <option value="string">字符串</option>
-              <option value="number">数字</option>
-              <option value="boolean">布尔值</option>
-              <option value="null">null</option>
-              <option value="object">对象 (JSON)</option>
-              <option value="array">数组 (JSON)</option>
-            </select>
           </div>
         </div>
         <div class="edit-dialog-footer">
@@ -949,8 +937,14 @@ function saveEditValue() {
       case 'null':
         if (editForm.value.value.toLowerCase() === 'null') {
           newValue = null
+        } else if (editForm.value.value.toLowerCase() === 'true') {
+          newValue = true
+        } else if (editForm.value.value.toLowerCase() === 'false') {
+          newValue = false
+        } else if (!isNaN(Number(editForm.value.value))) {
+          newValue = Number(editForm.value.value)
         } else {
-          throw new Error('无效的null格式')
+          newValue = editForm.value.value
         }
         break
       case 'object':
@@ -1023,6 +1017,66 @@ function updateJsonValue(path: (string|number)[], newValue: any) {
   // 保存到历史记录
   addToHistory(parsedJson.value)
 }
+
+const searchText = ref('')
+
+// 递归过滤JSON，返回只包含匹配key或value的树
+function filterJsonTree(data: any, keyword: string): any {
+  if (!keyword) return data
+  if (data === null || data === undefined) return null
+  const kw = keyword.toLowerCase()
+  if (Array.isArray(data)) {
+    const filteredArr = data
+      .map(item => filterJsonTree(item, keyword))
+      .filter(item => item !== null && item !== undefined)
+    return filteredArr.length > 0 ? filteredArr : null
+  } else if (typeof data === 'object') {
+    let matched = false
+    const result: any = Array.isArray(data) ? [] : {}
+    for (const [k, v] of Object.entries(data)) {
+      // key 匹配
+      if (k.toLowerCase().includes(kw)) {
+        result[k] = v
+        matched = true
+        continue
+      }
+      // value 匹配
+      if (typeof v === 'string' && v.toLowerCase().includes(kw)) {
+        result[k] = v
+        matched = true
+        continue
+      }
+      if (typeof v === 'number' && v.toString().includes(kw)) {
+        result[k] = v
+        matched = true
+        continue
+      }
+      if (typeof v === 'boolean' && v.toString().toLowerCase().includes(kw)) {
+        result[k] = v
+        matched = true
+        continue
+      }
+      // 递归子节点
+      const child = filterJsonTree(v, keyword)
+      if (child !== null && child !== undefined && (typeof child === 'object' && Object.keys(child).length > 0 || Array.isArray(child) && child.length > 0)) {
+        result[k] = child
+        matched = true
+      }
+    }
+    return matched ? result : null
+  } else {
+    // 基本类型直接匹配
+    if (typeof data === 'string' && data.toLowerCase().includes(kw)) return data
+    if (typeof data === 'number' && data.toString().includes(kw)) return data
+    if (typeof data === 'boolean' && data.toString().toLowerCase().includes(kw)) return data
+    return null
+  }
+}
+
+const filteredJson = computed(() => {
+  if (!searchText.value) return parsedJson.value
+  return filterJsonTree(parsedJson.value, searchText.value)
+})
 </script>
 
 <style scoped>
