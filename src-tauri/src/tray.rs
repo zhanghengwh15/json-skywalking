@@ -91,11 +91,11 @@ pub fn setup_global_shortcut(app: &tauri::App) {
 }
 
 /// 处理应用运行事件
-pub fn handle_run_event(app_handle: &tauri::AppHandle, event: &tauri::RunEvent) {
+pub fn handle_run_event(_app_handle: &tauri::AppHandle, _event: &tauri::RunEvent) {
     #[cfg(target_os = "macos")]
-    match event {
+    match _event {
         tauri::RunEvent::Reopen { .. } => {
-            if let Some(window) = app_handle.get_webview_window("main") {
+            if let Some(window) = _app_handle.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
