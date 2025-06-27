@@ -5,8 +5,6 @@ mod clipboard;
 mod store;
 mod tray;
 
-use tauri::Manager;
-
 // 重新导出需要的类型
 pub use store::{ParseRecord, SqlHistoryItem, JsonHistoryItem};
 
