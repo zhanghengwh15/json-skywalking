@@ -1025,14 +1025,20 @@ function filterJsonTree(data: any, keyword: string): any {
   if (!keyword) return data
   if (data === null || data === undefined) return null
   const kw = keyword.toLowerCase()
+  
   if (Array.isArray(data)) {
+    // 处理数组：保持数组结构，只显示匹配的元素
     const filteredArr = data
-      .map(item => filterJsonTree(item, keyword))
+      .map((item, index) => {
+        const filteredItem = filterJsonTree(item, keyword)
+        return filteredItem !== null && filteredItem !== undefined ? filteredItem : null
+      })
       .filter(item => item !== null && item !== undefined)
     return filteredArr.length > 0 ? filteredArr : null
   } else if (typeof data === 'object') {
     let matched = false
-    const result: any = Array.isArray(data) ? [] : {}
+    const result: any = {}
+    
     for (const [k, v] of Object.entries(data)) {
       // key 匹配
       if (k.toLowerCase().includes(kw)) {
@@ -1040,6 +1046,7 @@ function filterJsonTree(data: any, keyword: string): any {
         matched = true
         continue
       }
+      
       // value 匹配
       if (typeof v === 'string' && v.toLowerCase().includes(kw)) {
         result[k] = v
@@ -1056,11 +1063,17 @@ function filterJsonTree(data: any, keyword: string): any {
         matched = true
         continue
       }
+      
       // 递归子节点
       const child = filterJsonTree(v, keyword)
-      if (child !== null && child !== undefined && (typeof child === 'object' && Object.keys(child).length > 0 || Array.isArray(child) && child.length > 0)) {
-        result[k] = child
-        matched = true
+      if (child !== null && child !== undefined) {
+        // 检查子节点是否有内容
+        const hasContent = Array.isArray(child) ? child.length > 0 : 
+                          typeof child === 'object' ? Object.keys(child).length > 0 : true
+        if (hasContent) {
+          result[k] = child
+          matched = true
+        }
       }
     }
     return matched ? result : null
