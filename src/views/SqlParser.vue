@@ -89,6 +89,18 @@
     
     <!-- 历史记录遮罩 -->
     <div v-if="showHistory" class="history-overlay" @click="toggleHistory"></div>
+    
+    <!-- 美化提示框 -->
+    <div v-if="showToast" class="toast-overlay">
+      <div class="toast-container" :class="toastType">
+        <div class="toast-icon">
+          <span v-if="toastType === 'success'">✅</span>
+          <span v-else-if="toastType === 'error'">❌</span>
+          <span v-else>ℹ️</span>
+        </div>
+        <div class="toast-message">{{ toastMessage }}</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -119,6 +131,11 @@ interface SqlHistoryItem {
 
 const historyList = ref<SqlHistoryItem[]>([])
 const showHistory = ref(false)
+
+// 提示框相关
+const showToast = ref(false)
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error' | 'info'>('info')
 
 // 生成哈希
 function generateHash(sql: string): string {
@@ -202,18 +219,21 @@ function loadFromHistory(item: SqlHistoryItem) {
   error.value = ''
   showHistory.value = false
   isFormatted.value = true
+  showToastMessage('已加载历史记录', 'success')
 }
 
 // 移除历史记录
 function removeFromHistory(index: number) {
   historyList.value.splice(index, 1)
   saveHistoryToFile()
+  showToastMessage('已删除历史记录', 'info')
 }
 
 // 清空历史记录
 function clearHistory() {
   historyList.value = []
   saveHistoryToFile()
+  showToastMessage('历史记录已清空', 'info')
 }
 
 // 切换历史记录显示
@@ -371,6 +391,8 @@ const parseSql = async () => {
       addToHistory(inputText.value, filledSql)
     }
     
+    showToastMessage('SQL解析成功！', 'success')
+    
   } catch (err) {
     error.value = err instanceof Error ? err.message : '解析失败'
   } finally {
@@ -383,13 +405,25 @@ const resetError = () => {
   error.value = ''
 }
 
+// 显示提示框
+const showToastMessage = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  toastMessage.value = message
+  toastType.value = type
+  showToast.value = true
+  
+  // 3秒后自动消失
+  setTimeout(() => {
+    showToast.value = false
+  }, 3000)
+}
+
 // 复制到剪贴板
 const copyToClipboard = async () => {
   if (!parsedSql.value) return
   
   try {
     await navigator.clipboard.writeText(parsedSql.value)
-    alert('SQL已复制到剪贴板！')
+    showToastMessage('SQL已复制到剪贴板！', 'success')
   } catch (err) {
     // 降级方案
     const textArea = document.createElement('textarea')
@@ -398,7 +432,7 @@ const copyToClipboard = async () => {
     textArea.select()
     document.execCommand('copy')
     document.body.removeChild(textArea)
-    alert('SQL已复制到剪贴板！')
+    showToastMessage('SQL已复制到剪贴板！', 'success')
   }
 }
 
@@ -443,9 +477,11 @@ const autoProcessClipboard = async () => {
     // 自动复制格式化后的结果
     if (parsedSql.value) {
       await navigator.clipboard.writeText(formattedSql.value)
+      showToastMessage('已自动复制格式化后的SQL到剪贴板', 'success')
     }
   } catch (err) {
     console.error('处理剪贴板内容失败:', err)
+    showToastMessage('处理剪贴板内容失败', 'error')
   }
 }
 
@@ -839,5 +875,83 @@ onUnmounted(() => {
 .clear-all-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 提示框样式 */
+.toast-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.toast-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: toastSlideIn 0.3s ease-out;
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.toast-container.success {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: white;
+}
+
+.toast-container.error {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+}
+
+.toast-container.info {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  flex: 1;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
 }
 </style> 
