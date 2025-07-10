@@ -620,68 +620,36 @@ function checkTempJsonData() {
   }
 }
 
-// 清理JSON中的注释和多余逗号
-const cleanJsonComments = (jsonStr: string): string => {
-  let result = jsonStr
-  
-  // 移除单行注释 // 注释内容
-  result = result.replace(/\/\/.*$/gm, '')
-  
-  // 移除多行注释 /* 注释内容 */
-  result = result.replace(/\/\*[\s\S]*?\*\//g, '')
-  
-  // 清理多余的空行和空格
-  result = result.replace(/\n\s*\n/g, '\n').trim()
-  
-  // 智能清理多余的逗号
-  result = cleanTrailingCommas(result)
-  
-  return result
-}
-
-// 智能清理多余的逗号
-const cleanTrailingCommas = (jsonStr: string): string => {
-  let result = jsonStr
-  
-  // 移除对象和数组结尾的尾随逗号（包括多行情况）
-  result = result.replace(/,(\s*[}\]])/g, '$1')
-  
-  // 移除对象属性之间的多余逗号（连续逗号）
-  result = result.replace(/,(\s*,)/g, ',')
-  
-  // 移除行尾的孤立逗号（后面没有属性或值的逗号）
-  result = result.replace(/,(\s*\n\s*[}\]])/g, '$1')
-  
-  // 处理特殊情况：属性后面直接跟 } 的逗号
-  result = result.replace(/,(\s*})/g, '$1')
-  
-  // 处理特殊情况：数组元素后面直接跟 ] 的逗号
-  result = result.replace(/,(\s*\])/g, '$1')
-  
-  // 移除对象属性值后面多余的逗号（在换行后跟 } 的情况）
-  result = result.replace(/,(\s*\n\s*})/g, '$1')
-  
-  // 移除数组元素后面多余的逗号（在换行后跟 ] 的情况）
-  result = result.replace(/,(\s*\n\s*\])/g, '$1')
-  
-  // 处理多行情况：移除属性值后面多余的逗号
-  result = result.replace(/,(\s*\n\s*[}\]])/g, '$1')
-  
-  // 处理特殊情况：最后一个属性后面有多余逗号
-  result = result.replace(/,(\s*\n\s*})/g, '$1')
-  
-  // 处理特殊情况：最后一个数组元素后面有多余逗号
-  result = result.replace(/,(\s*\n\s*\])/g, '$1')
-  
-  // 更精确的处理：移除在 } 或 ] 之前的逗号（包括可能的空白字符）
-  result = result.replace(/,(\s*[}\]])/g, '$1')
-  
-  return result
+/**
+ * 清理JSON字符串中的注释和多余逗号
+ * @param jsonStr 原始JSON字符串
+ * @returns 清理后的JSON字符串
+ */
+const cleanJsonString = (jsonStr: string): string => {
+  return jsonStr
+    // 移除单行注释 // 注释内容
+    .replace(/\/\/.*$/gm, '')
+    // 移除多行注释 /* 注释内容 */
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    // 清理多余的空行
+    .replace(/\n\s*\n/g, '\n')
+    // 移除连续逗号
+    .replace(/,(\s*,)/g, ',')
+    // 移除尾随逗号（对象和数组结尾）
+    .replace(/,(\s*[}\]])/g, '$1')
+    // 移除行尾孤立逗号
+    .replace(/,(\s*\n\s*[}\]])/g, '$1')
+    // 移除属性值后的多余逗号
+    .replace(/,(\s*\n\s*})/g, '$1')
+    .replace(/,(\s*\n\s*\])/g, '$1')
+    // 最终清理：移除所有在 } 或 ] 之前的逗号
+    .replace(/,(\s*[}\]])/g, '$1')
+    .trim()
 }
 
 // 解析带注释的JSON
 const parseJsonWithComments = (jsonStr: string): any => {
-  const cleanedJson = cleanJsonComments(jsonStr)
+  const cleanedJson = cleanJsonString(jsonStr)
   
   // 调试：如果原始JSON和清理后的JSON不同，在控制台输出
   if (jsonStr !== cleanedJson) {
