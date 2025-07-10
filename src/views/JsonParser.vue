@@ -2,7 +2,7 @@
   <div class="json-parser">
     <div class="header">
       <h1>JSON 解析与格式化工具</h1>
-      <p>使用快捷键或按钮从剪贴板加载JSON数据</p>
+      <p>使用快捷键或按钮从剪贴板加载JSON数据（支持带注释和多余逗号的JSON）</p>
     </div>
     <div class="content">
       <div class="input-section">
@@ -38,6 +38,7 @@
             <div class="placeholder-icon">📋</div>
             <p>使用 <kbd>⌘⇧G</kbd> 或 <kbd>⌘V</kbd> 从剪贴板加载JSON数据</p>
             <p class="placeholder-hint">或点击上方的"获取剪贴板"按钮</p>
+            <p class="placeholder-hint">💡 支持带注释和多余逗号的JSON格式</p>
           </div>
         </div>
         <div v-if="clipboardStatus" class="clipboard-status" :class="clipboardStatus.type">
@@ -596,7 +597,7 @@ function checkTempJsonData() {
       localStorage.removeItem('tempJsonData')
       
       // 解析并加载JSON数据
-      const jsonData = JSON.parse(tempData)
+      const jsonData = parseJsonWithComments(tempData)
       parsedJson.value = jsonData
       inputJson.value = tempData
       selectedKeyPath.value = []
@@ -619,10 +620,83 @@ function checkTempJsonData() {
   }
 }
 
-// 检查字符串是否为有效JSON
+// 清理JSON中的注释和多余逗号
+const cleanJsonComments = (jsonStr: string): string => {
+  let result = jsonStr
+  
+  // 移除单行注释 // 注释内容
+  result = result.replace(/\/\/.*$/gm, '')
+  
+  // 移除多行注释 /* 注释内容 */
+  result = result.replace(/\/\*[\s\S]*?\*\//g, '')
+  
+  // 清理多余的空行和空格
+  result = result.replace(/\n\s*\n/g, '\n').trim()
+  
+  // 智能清理多余的逗号
+  result = cleanTrailingCommas(result)
+  
+  return result
+}
+
+// 智能清理多余的逗号
+const cleanTrailingCommas = (jsonStr: string): string => {
+  let result = jsonStr
+  
+  // 移除对象和数组结尾的尾随逗号（包括多行情况）
+  result = result.replace(/,(\s*[}\]])/g, '$1')
+  
+  // 移除对象属性之间的多余逗号（连续逗号）
+  result = result.replace(/,(\s*,)/g, ',')
+  
+  // 移除行尾的孤立逗号（后面没有属性或值的逗号）
+  result = result.replace(/,(\s*\n\s*[}\]])/g, '$1')
+  
+  // 处理特殊情况：属性后面直接跟 } 的逗号
+  result = result.replace(/,(\s*})/g, '$1')
+  
+  // 处理特殊情况：数组元素后面直接跟 ] 的逗号
+  result = result.replace(/,(\s*\])/g, '$1')
+  
+  // 移除对象属性值后面多余的逗号（在换行后跟 } 的情况）
+  result = result.replace(/,(\s*\n\s*})/g, '$1')
+  
+  // 移除数组元素后面多余的逗号（在换行后跟 ] 的情况）
+  result = result.replace(/,(\s*\n\s*\])/g, '$1')
+  
+  // 处理多行情况：移除属性值后面多余的逗号
+  result = result.replace(/,(\s*\n\s*[}\]])/g, '$1')
+  
+  // 处理特殊情况：最后一个属性后面有多余逗号
+  result = result.replace(/,(\s*\n\s*})/g, '$1')
+  
+  // 处理特殊情况：最后一个数组元素后面有多余逗号
+  result = result.replace(/,(\s*\n\s*\])/g, '$1')
+  
+  // 更精确的处理：移除在 } 或 ] 之前的逗号（包括可能的空白字符）
+  result = result.replace(/,(\s*[}\]])/g, '$1')
+  
+  return result
+}
+
+// 解析带注释的JSON
+const parseJsonWithComments = (jsonStr: string): any => {
+  const cleanedJson = cleanJsonComments(jsonStr)
+  
+  // 调试：如果原始JSON和清理后的JSON不同，在控制台输出
+  if (jsonStr !== cleanedJson) {
+    console.log('JSON清理前后对比:')
+    console.log('原始JSON:', jsonStr)
+    console.log('清理后JSON:', cleanedJson)
+  }
+  
+  return JSON.parse(cleanedJson)
+}
+
+// 检查字符串是否为有效JSON（支持注释）
 const isValidJson = (str: string): boolean => {
   try {
-    JSON.parse(str)
+    parseJsonWithComments(str)
     return true
   } catch {
     return false
@@ -636,7 +710,7 @@ const setupGlobalShortcutListeners = async () => {
     await listen('global-clipboard-json', (event) => {
       const clipboardText = event.payload as string
       try {
-        const parsed = JSON.parse(clipboardText)
+        const parsed = parseJsonWithComments(clipboardText)
         parsedJson.value = parsed
         inputJson.value = clipboardText
         error.value = ''
@@ -676,7 +750,7 @@ const getClipboardContent = async () => {
     // 检查是否为有效JSON并直接解析
     if (isValidJson(clipboardText)) {
       try {
-        const parsed = JSON.parse(clipboardText)
+        const parsed = parseJsonWithComments(clipboardText)
         parsedJson.value = parsed
         inputJson.value = clipboardText
         error.value = ''
@@ -719,7 +793,7 @@ const autoCheckClipboard = async () => {
     
     if (clipboardText && clipboardText.trim() && isValidJson(clipboardText)) {
       try {
-        parsedJson.value = JSON.parse(clipboardText)
+        parsedJson.value = parseJsonWithComments(clipboardText)
         inputJson.value = clipboardText
         error.value = ''
         addToHistory(parsedJson.value)
