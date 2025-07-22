@@ -54,6 +54,9 @@
               复制值
               <span class="shortcut-hint">⌘C</span>
             </button>
+            <button @click="escapeClipboardJson" class="copy-btn" title="从剪贴板获取数据并转义引号">
+              转义剪贴板
+            </button>
             <button @click="toggleHistory" class="history-btn">
               历史记录 ({{ historyList.length }})
             </button>
@@ -467,6 +470,37 @@ async function copySelectedValue() {
     showClipboardStatus('success', '已复制到剪贴板！')
   } catch (err) {
     showClipboardStatus('error', '复制失败')
+  }
+}
+
+async function escapeClipboardJson() {
+  try {
+    // 从剪贴板获取文本
+    const clipboardText = await invoke<string>('get_clipboard')
+    
+    if (!clipboardText || !clipboardText.trim()) {
+      showClipboardStatus('info', '剪贴板为空')
+      return
+    }
+    
+    // 使用JSON.stringify来正确处理所有转义字符
+    // 这样可以确保换行符、引号、反斜杠等都被正确转义
+    const escapedText = JSON.stringify(clipboardText)
+    
+    // 将转义后的文本复制回剪贴板
+    await navigator.clipboard.writeText(escapedText)
+    
+    // 尝试解析转义后的JSON以验证格式
+    try {
+      const testJson = JSON.parse(escapedText)
+      showClipboardStatus('success', '已转义所有特殊字符并复制到剪贴板！')
+    } catch (parseErr) {
+      showClipboardStatus('info', '已转义特殊字符，但JSON格式可能仍有问题')
+    }
+    
+  } catch (err) {
+    console.error('转义剪贴板失败:', err)
+    showClipboardStatus('error', '转义剪贴板失败: ' + (err instanceof Error ? err.message : String(err)))
   }
 }
 
