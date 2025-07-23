@@ -492,7 +492,7 @@ async function escapeClipboardJson() {
     
     // 尝试解析转义后的JSON以验证格式
     try {
-      const testJson = JSON.parse(escapedText)
+      JSON.parse(escapedText)
       showClipboardStatus('success', '已转义所有特殊字符并复制到剪贴板！')
     } catch (parseErr) {
       showClipboardStatus('info', '已转义特殊字符，但JSON格式可能仍有问题')
@@ -1105,7 +1105,7 @@ function filterJsonTree(data: any, keyword: string): any {
   if (Array.isArray(data)) {
     // 处理数组：保持数组结构，只显示匹配的元素
     const filteredArr = data
-      .map((item, index) => {
+      .map((item) => {
         const filteredItem = filterJsonTree(item, keyword)
         return filteredItem !== null && filteredItem !== undefined ? filteredItem : null
       })
