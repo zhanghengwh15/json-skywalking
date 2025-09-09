@@ -302,12 +302,36 @@ const parseParameters = (arrStr: string): Array<{value: any, type: string}> => {
 const replaceParameters = (sql: string, parameters: Array<{value: any, type: string}>): string => {
   let sqlBuilder = sql.trim()
   
-  // 确保SQL以SELECT开头
-  if (!sqlBuilder.toLowerCase().startsWith('select')) {
-    const selectIndex = sqlBuilder.toLowerCase().indexOf('select')
-    if (selectIndex > 0) {
-      sqlBuilder = 'SELECT ' + sqlBuilder.substring(selectIndex + 6)
+  // 确保SQL以SELECT、UPDATE或INSERT开头
+  const lowerSql = sqlBuilder.toLowerCase()
+  if (!lowerSql.startsWith('select') && !lowerSql.startsWith('update') && !lowerSql.startsWith('insert')) {
+    // 查找第一个SQL关键字
+    const selectIndex = lowerSql.indexOf('select')
+    const updateIndex = lowerSql.indexOf('update')
+    const insertIndex = lowerSql.indexOf('insert')
+    
+    let keywordIndex = -1
+    let keyword = ''
+    
+    // 找到第一个出现的关键字
+    if (selectIndex >= 0) {
+      keywordIndex = selectIndex
+      keyword = 'SELECT'
+    }
+    if (updateIndex >= 0 && (keywordIndex === -1 || updateIndex < keywordIndex)) {
+      keywordIndex = updateIndex
+      keyword = 'UPDATE'
+    }
+    if (insertIndex >= 0 && (keywordIndex === -1 || insertIndex < keywordIndex)) {
+      keywordIndex = insertIndex
+      keyword = 'INSERT'
+    }
+    
+    if (keywordIndex > 0) {
+      // 如果关键字不在开头，则从关键字开始截取
+      sqlBuilder = keyword + ' ' + sqlBuilder.substring(keywordIndex + keyword.length)
     } else {
+      // 如果没找到关键字，默认添加SELECT
       sqlBuilder = 'SELECT ' + sqlBuilder
     }
   }
