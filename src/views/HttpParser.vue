@@ -333,6 +333,12 @@ const extractValidJson = (text: string): string => {
 
 // 提取URL路径（去掉协议、域名/IP、端口之前的部分）
 const extractUrlPath = (url: string): string => {
+  // 先清理掉HTTP相关的信息，如 http.method:POST, http.body: 等
+  url = url.replace(/\s+http\.method:\w+.*$/i, '')
+  url = url.replace(/\s+http\.body:.*$/i, '')
+  url = url.replace(/\s+http\.headers?:.*$/i, '')
+  url = url.trim()
+  
   // 处理完整URL（包含协议）
   if (url.includes('://')) {
     try {
