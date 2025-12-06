@@ -106,7 +106,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
+import { isValidJson } from '../utils/jsonUtils'
+
+const router = useRouter()
 
 // 响应式数据
 const inputText = ref('')
@@ -491,6 +495,14 @@ const autoProcessClipboard = async () => {
   try {
     const clipboardText = await invoke<string>('get_clipboard')
     if (!clipboardText || !clipboardText.trim()) return
+    
+    // 检测是否为JSON格式
+    if (isValidJson(clipboardText)) {
+      // 如果是JSON，保存到localStorage并跳转到JsonParser
+      localStorage.setItem('tempJsonData', clipboardText)
+      router.push('/json-parser')
+      return
+    }
     
     // 设置输入内容
     inputText.value = clipboardText

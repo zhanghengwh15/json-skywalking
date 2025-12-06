@@ -178,6 +178,7 @@
 import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { parseJsonWithComments, isValidJson } from '../utils/jsonUtils'
 import '../assets/styles/JsonParser.css'
 
 // 递归查找value
@@ -654,56 +655,6 @@ function checkTempJsonData() {
   }
 }
 
-/**
- * 清理JSON字符串中的注释和多余逗号
- * @param jsonStr 原始JSON字符串
- * @returns 清理后的JSON字符串
- */
-const cleanJsonString = (jsonStr: string): string => {
-  return jsonStr
-    // 移除单行注释 // 注释内容
-    .replace(/\/\/.*$/gm, '')
-    // 移除多行注释 /* 注释内容 */
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    // 清理多余的空行
-    .replace(/\n\s*\n/g, '\n')
-    // 移除连续逗号
-    .replace(/,(\s*,)/g, ',')
-    // 移除尾随逗号（对象和数组结尾）
-    .replace(/,(\s*[}\]])/g, '$1')
-    // 移除行尾孤立逗号
-    .replace(/,(\s*\n\s*[}\]])/g, '$1')
-    // 移除属性值后的多余逗号
-    .replace(/,(\s*\n\s*})/g, '$1')
-    .replace(/,(\s*\n\s*\])/g, '$1')
-    // 最终清理：移除所有在 } 或 ] 之前的逗号
-    .replace(/,(\s*[}\]])/g, '$1')
-    .trim()
-}
-
-// 解析带注释的JSON
-const parseJsonWithComments = (jsonStr: string): any => {
-  const cleanedJson = cleanJsonString(jsonStr)
-  
-  // 调试：如果原始JSON和清理后的JSON不同，在控制台输出
-  if (jsonStr !== cleanedJson) {
-    console.log('JSON清理前后对比:')
-    console.log('原始JSON:', jsonStr)
-    console.log('清理后JSON:', cleanedJson)
-  }
-  
-  return JSON.parse(cleanedJson)
-}
-
-// 检查字符串是否为有效JSON（支持注释）
-const isValidJson = (str: string): boolean => {
-  try {
-    parseJsonWithComments(str)
-    return true
-  } catch {
-    return false
-  }
-}
 
 // 处理全局快捷键事件
 const setupGlobalShortcutListeners = async () => {
