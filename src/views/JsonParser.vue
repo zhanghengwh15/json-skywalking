@@ -50,6 +50,16 @@
         <div class="section-header">
           <h3>值内容</h3>
           <div class="actions">
+            <button 
+              v-if="isEditing && selectedKeyPath.length > 0" 
+              @click="() => saveEditedValue(false)" 
+              :disabled="!parsedJson || !isEditing" 
+              class="save-btn" 
+              title="保存编辑 (⌘S / Ctrl+S)"
+            >
+              保存编辑
+              <span class="shortcut-hint">⌘S</span>
+            </button>
             <button @click="copySelectedValue" :disabled="!parsedJson" class="copy-btn" title="复制选中节点的值 (⌘C / Ctrl+C)">
               复制值
               <span class="shortcut-hint">⌘C</span>
@@ -69,6 +79,17 @@
           </div>
           <div v-else-if="!parsedJson" class="placeholder">
             解析后的JSON将在这里显示...
+          </div>
+          <div v-else-if="isEditing && selectedKeyPath.length > 0" class="json-edit-container">
+            <textarea
+              v-model="editedValue"
+              class="json-edit-textarea"
+              placeholder="编辑JSON值..."
+              @blur="autoSaveOnBlur"
+            ></textarea>
+            <div v-if="editError" class="edit-error-message">
+              {{ editError }}
+            </div>
           </div>
           <div v-else class="json-display" v-html="highlightedDisplay"></div>
         </div>
@@ -375,6 +396,12 @@ const clipboardStatus = ref<{type: 'success' | 'error' | 'info', message: string
 const selectedKeyPath = ref<(string|number)[]>([])
 const showHistory = ref(false)
 
+// 编辑相关
+const isEditing = ref(false)
+const editedValue = ref('')
+const editError = ref('')
+const previousKeyPath = ref<(string|number)[]>([])
+
 // 右键菜单相关
 const showContextMenu = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
@@ -416,7 +443,35 @@ const highlightedDisplay = computed(() => {
 })
 
 function onSelectKey(path: (string|number)[]) {
+  // 如果之前有编辑且key路径不同，自动保存
+  if (isEditing.value && previousKeyPath.value.length > 0 && 
+      JSON.stringify(previousKeyPath.value) !== JSON.stringify(path)) {
+    saveEditedValue(true) // 静默保存
+  }
+  
+  // 更新路径
+  previousKeyPath.value = path.slice()
   selectedKeyPath.value = path
+  
+  // 如果选中了key，自动进入编辑模式
+  if (path.length > 0) {
+    isEditing.value = true
+    editError.value = ''
+    // 初始化编辑值
+    const value = getValueByPath(parsedJson.value, path)
+    if (value !== undefined && value !== null) {
+      if (typeof value === 'object') {
+        editedValue.value = JSON.stringify(value, null, 2)
+      } else {
+        editedValue.value = String(value)
+      }
+    } else {
+      editedValue.value = ''
+    }
+  } else {
+    isEditing.value = false
+    editedValue.value = ''
+  }
 }
 
 // 处理右键菜单
@@ -825,6 +880,17 @@ const handleKeydown = (event: KeyboardEvent) => {
     event.stopPropagation()
     copySelectedValue()
   }
+
+  // Command+S (Mac) 或 Ctrl+S (Windows/Linux) - 保存编辑
+  if (isModifierPressed && !event.shiftKey && event.key.toLowerCase() === 's') {
+    const activeElement = document.activeElement as HTMLElement
+    const isTextareaFocused = activeElement && activeElement.tagName === 'TEXTAREA'
+    if (isTextareaFocused && isEditing.value) {
+      event.preventDefault()
+      event.stopPropagation()
+      saveEditedValue()
+    }
+  }
 }
 
 // 生命周期钩子
@@ -1019,6 +1085,91 @@ function editValue() {
   showEditDialog.value = true
 }
 
+// 保存编辑的值
+function saveEditedValue(silent: boolean = false) {
+  if (!isEditing.value || !selectedKeyPath.value.length || !parsedJson.value) {
+    return
+  }
+  
+  try {
+    editError.value = ''
+    const trimmedValue = editedValue.value.trim()
+    
+    // 允许空值（null）
+    if (trimmedValue === '' || trimmedValue.toLowerCase() === 'null') {
+      updateJsonValue(selectedKeyPath.value, null)
+      if (!silent) {
+        showClipboardStatus('success', '值已保存！')
+      }
+      return
+    }
+    
+    // 尝试解析JSON值
+    let newValue: any
+    try {
+      // 首先尝试使用parseJsonWithComments解析（支持注释和多余逗号）
+      newValue = parseJsonWithComments(trimmedValue, false)
+    } catch (parseError) {
+      // 如果解析失败，尝试作为基本类型处理
+      // 尝试作为布尔值（优先于数字，因为"true"/"false"可能被误判为数字）
+      if (trimmedValue.toLowerCase() === 'true') {
+        newValue = true
+      } else if (trimmedValue.toLowerCase() === 'false') {
+        newValue = false
+      }
+      // 尝试作为数字（排除布尔值字符串）
+      else if (trimmedValue !== 'true' && trimmedValue !== 'false' && 
+               !isNaN(Number(trimmedValue)) && trimmedValue !== '') {
+        // 检查是否为有效的数字字符串（排除空字符串和NaN）
+        const numValue = Number(trimmedValue)
+        if (!isNaN(numValue) && isFinite(numValue)) {
+          newValue = numValue
+        } else {
+          throw new Error('无效的数字格式')
+        }
+      }
+      // 尝试解析带引号的字符串
+      else if ((trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
+               (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))) {
+        try {
+          // 尝试作为JSON字符串解析
+          newValue = JSON.parse(trimmedValue)
+        } catch {
+          // 如果解析失败，移除引号作为普通字符串
+          newValue = trimmedValue.slice(1, -1)
+        }
+      }
+      // 否则作为普通字符串
+      else {
+        newValue = trimmedValue
+      }
+    }
+    
+    // 更新JSON数据中的值
+    updateJsonValue(selectedKeyPath.value, newValue)
+    
+    if (!silent) {
+      showClipboardStatus('success', '值已保存！')
+    }
+    
+  } catch (err) {
+    editError.value = '保存失败: ' + (err instanceof Error ? err.message : String(err))
+    if (!silent) {
+      showClipboardStatus('error', editError.value)
+    }
+  }
+}
+
+// 失去焦点时自动保存
+function autoSaveOnBlur() {
+  // 延迟保存，避免与点击事件冲突
+  setTimeout(() => {
+    if (isEditing.value && editedValue.value.trim()) {
+      saveEditedValue(true) // 静默保存
+    }
+  }, 200)
+}
+
 // 更新JSON数据中的值
 function updateJsonValue(path: (string|number)[], newValue: any) {
   if (!parsedJson.value || !path.length) return
@@ -1043,6 +1194,15 @@ function updateJsonValue(path: (string|number)[], newValue: any) {
   
   // 保存到历史记录
   addToHistory(parsedJson.value)
+  
+  // 如果正在编辑当前路径，更新编辑值
+  if (isEditing.value && JSON.stringify(selectedKeyPath.value) === JSON.stringify(path)) {
+    if (typeof newValue === 'object') {
+      editedValue.value = JSON.stringify(newValue, null, 2)
+    } else {
+      editedValue.value = String(newValue)
+    }
+  }
 }
 
 const searchText = ref('')

@@ -320,6 +320,70 @@
   word-break: break-all;
 }
 
+.json-edit-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.json-edit-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  padding: 15px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 2px solid #42b983;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.json-edit-textarea:focus {
+  border-color: #42b983;
+  box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.2);
+}
+
+.edit-error-message {
+  margin-top: 10px;
+  padding: 10px;
+  background: #3c1e1e;
+  color: #f48771;
+  border-radius: 4px;
+  border-left: 4px solid #e74c3c;
+  font-size: 13px;
+}
+
+.save-btn {
+  background: #42b983;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #35a372;
+  transform: translateY(-1px);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .placeholder {
   color: #6a6a6a;
   text-align: center;
