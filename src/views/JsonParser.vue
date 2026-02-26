@@ -81,12 +81,15 @@
             解析后的JSON将在这里显示...
           </div>
           <div v-else-if="isEditing && selectedKeyPath.length > 0" class="json-edit-container">
-            <textarea
-              v-model="editedValue"
+            <div
+              ref="editAreaRef"
+              contenteditable="true"
               class="json-edit-textarea"
-              placeholder="编辑JSON值..."
+              data-placeholder="编辑JSON值..."
+              @input="onEditInput"
               @blur="autoSaveOnBlur"
-            ></textarea>
+              @keydown="onEditKeydown"
+            ></div>
             <div v-if="editError" class="edit-error-message">
               {{ editError }}
             </div>
@@ -401,6 +404,8 @@ const isEditing = ref(false)
 const editedValue = ref('')
 const editError = ref('')
 const previousKeyPath = ref<(string|number)[]>([])
+const editAreaRef = ref<HTMLElement | null>(null)
+const isUpdatingHighlight = ref(false) // 防止高亮更新时的循环
 
 // 右键菜单相关
 const showContextMenu = ref(false)
@@ -459,15 +464,36 @@ function onSelectKey(path: (string|number)[]) {
     editError.value = ''
     // 初始化编辑值
     const value = getValueByPath(parsedJson.value, path)
+    let initialValue = ''
     if (value !== undefined && value !== null) {
       if (typeof value === 'object') {
-        editedValue.value = JSON.stringify(value, null, 2)
+        initialValue = JSON.stringify(value, null, 2)
       } else {
-        editedValue.value = String(value)
+        initialValue = String(value)
       }
-    } else {
-      editedValue.value = ''
     }
+    editedValue.value = initialValue
+    
+    // 等待 DOM 更新后初始化 contenteditable div
+    setTimeout(() => {
+      if (editAreaRef.value) {
+        isUpdatingHighlight.value = true
+        if (initialValue) {
+          const highlighted = syntaxHighlight(initialValue)
+          editAreaRef.value.innerHTML = highlighted || ''
+          // 将光标移到末尾
+          const range = document.createRange()
+          const selection = window.getSelection()
+          range.selectNodeContents(editAreaRef.value)
+          range.collapse(false)
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+        } else {
+          editAreaRef.value.innerHTML = ''
+        }
+        isUpdatingHighlight.value = false
+      }
+    }, 0)
   } else {
     isEditing.value = false
     editedValue.value = ''
@@ -940,6 +966,19 @@ watch([parsedJson, inputJson, selectedKeyPath, historyList], () => {
   saveCurrentState()
 }, { deep: true })
 
+// 监听 editedValue 变化，同步到 contenteditable div（仅在非输入更新时）
+watch(editedValue, (newValue) => {
+  if (isEditing.value && editAreaRef.value && !isUpdatingHighlight.value) {
+    const currentText = getTextFromElement(editAreaRef.value)
+    if (currentText !== newValue) {
+      isUpdatingHighlight.value = true
+      const highlighted = syntaxHighlight(newValue)
+      editAreaRef.value.innerHTML = highlighted || ''
+      isUpdatingHighlight.value = false
+    }
+  }
+})
+
 // 保存当前状态到localStorage
 function saveCurrentState() {
   if (parsedJson.value) {
@@ -1168,6 +1207,113 @@ function autoSaveOnBlur() {
       saveEditedValue(true) // 静默保存
     }
   }, 200)
+}
+
+// 保存光标位置
+function saveCursorPosition() {
+  if (!editAreaRef.value) return null
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+  
+  const range = selection.getRangeAt(0)
+  const preCaretRange = range.cloneRange()
+  preCaretRange.selectNodeContents(editAreaRef.value)
+  preCaretRange.setEnd(range.startContainer, range.startOffset)
+  
+  return {
+    start: preCaretRange.toString().length,
+    end: preCaretRange.toString().length + range.toString().length
+  }
+}
+
+// 恢复光标位置
+function restoreCursorPosition(position: { start: number, end: number } | null) {
+  if (!editAreaRef.value || !position) return
+  
+  const textNode = editAreaRef.value.firstChild
+  if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return
+  
+  const range = document.createRange()
+  const selection = window.getSelection()
+  
+  try {
+    let currentPos = 0
+    const walker = document.createTreeWalker(
+      editAreaRef.value,
+      NodeFilter.SHOW_TEXT,
+      null
+    )
+    
+    let node: Node | null = null
+    while ((node = walker.nextNode())) {
+      const nodeLength = node.textContent?.length || 0
+      if (currentPos + nodeLength >= position.start) {
+        range.setStart(node, position.start - currentPos)
+        range.setEnd(node, Math.min(position.end - currentPos, nodeLength))
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+        break
+      }
+      currentPos += nodeLength
+    }
+  } catch (e) {
+    console.error('恢复光标位置失败:', e)
+  }
+}
+
+// 从 contenteditable div 提取纯文本
+function getTextFromElement(element: HTMLElement): string {
+  // 处理 contenteditable 可能包含的 <br> 标签
+  const text = element.innerText || element.textContent || ''
+  return text.trim()
+}
+
+// 处理编辑输入
+function onEditInput(event: Event) {
+  if (isUpdatingHighlight.value) return
+  
+  const target = event.target as HTMLElement
+  const text = getTextFromElement(target)
+  
+  // 保存光标位置
+  const cursorPos = saveCursorPosition()
+  
+  // 更新 editedValue
+  editedValue.value = text
+  
+  // 应用语法高亮
+  isUpdatingHighlight.value = true
+  const highlighted = syntaxHighlight(text)
+  target.innerHTML = highlighted || ''
+  
+  // 恢复光标位置
+  setTimeout(() => {
+    restoreCursorPosition(cursorPos)
+    isUpdatingHighlight.value = false
+  }, 0)
+}
+
+// 处理编辑键盘事件
+function onEditKeydown(event: KeyboardEvent) {
+  // 处理 Tab 键（插入空格而不是切换焦点）
+  if (event.key === 'Tab') {
+    event.preventDefault()
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0)
+      range.deleteContents()
+      const tabNode = document.createTextNode('  ') // 2个空格
+      range.insertNode(tabNode)
+      range.setStartAfter(tabNode)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      
+      // 触发 input 事件以更新高亮
+      const inputEvent = new Event('input', { bubbles: true })
+      editAreaRef.value?.dispatchEvent(inputEvent)
+    }
+  }
 }
 
 // 更新JSON数据中的值

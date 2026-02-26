@@ -333,52 +333,77 @@ const extractValidJson = (text: string): string => {
 
 // 提取URL路径（去掉协议、域名/IP、端口之前的部分）
 const extractUrlPath = (url: string): string => {
+  // 处理多行输入，提取包含URL的行
+  const lines = url.split(/\r?\n/)
+  let urlLine = ''
+  
+  // 查找包含URL的行（优先查找 url: 开头的行，否则查找包含 http:// 或 https:// 的行）
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (/^url:\s*/i.test(trimmedLine)) {
+      urlLine = trimmedLine
+      break
+    } else if (trimmedLine.includes('://')) {
+      urlLine = trimmedLine
+      break
+    }
+  }
+  
+  // 如果没有找到URL行，使用整个输入
+  if (!urlLine) {
+    urlLine = url.trim()
+  }
+  
   // 先清理掉HTTP相关的信息，如 http.method:POST, http.body: 等
-  url = url.replace(/\s+http\.method:\w+.*$/i, '')
-  url = url.replace(/\s+http\.body:.*$/i, '')
-  url = url.replace(/\s+http\.headers?:.*$/i, '')
-  url = url.trim()
+  urlLine = urlLine.replace(/^http\.method:\s*\w+.*$/i, '')
+  urlLine = urlLine.replace(/^http\.body:.*$/i, '')
+  urlLine = urlLine.replace(/^http\.headers?:.*$/i, '')
+  
+  // 处理 url: 前缀格式（兼容 url:http://... 格式）
+  urlLine = urlLine.replace(/^url:\s*/i, '')
+  
+  urlLine = urlLine.trim()
   
   // 处理完整URL（包含协议）
-  if (url.includes('://')) {
+  if (urlLine.includes('://')) {
     try {
-      const urlObj = new URL(url)
+      const urlObj = new URL(urlLine)
       // 去掉开头的斜杠
       return urlObj.pathname.replace(/^\/+/, '') + (urlObj.search || '')
     } catch (e) {
       // 如果URL构造失败，使用正则表达式提取
-      const match = url.match(/^https?:\/\/[^\/]+\/(.*)/)
-  if (match && match[1]) {
-    return match[1]
+      const match = urlLine.match(/^https?:\/\/[^\/]+\/(.*)/)
+      if (match && match[1]) {
+        return match[1]
       }
     }
   }
   
   // 处理特定端口的情况
-  const portMatch = url.match(/:(\d+)\/(.*)/)
+  const portMatch = urlLine.match(/:(\d+)\/(.*)/)
   if (portMatch && portMatch[2]) {
     return portMatch[2]
   }
   
   // 处理localhost的情况
-  if (url.includes('localhost/')) {
-    return url.split('localhost/')[1] || url
+  if (urlLine.includes('localhost/')) {
+    return urlLine.split('localhost/')[1] || urlLine
   }
   
   // 处理IP地址的情况，如 192.168.100.31/path
-  const ipMatch = url.match(/\/\/[\d.]+\/(.*)/)
+  const ipMatch = urlLine.match(/\/\/[\d.]+\/(.*)/)
   if (ipMatch && ipMatch[1]) {
     return ipMatch[1]
   }
   
   // 处理域名的情况
-  if (url.includes('http://') || url.includes('https://')) {
-    const urlParts = url.split('/')
+  if (urlLine.includes('http://') || urlLine.includes('https://')) {
+    const urlParts = urlLine.split('/')
     return urlParts.slice(3).join('/') // 去掉协议和域名部分
   }
   
   // 如果都没匹配到，直接返回去掉开头斜杠的URL
-  return url.replace(/^\/+/, '')
+  return urlLine.replace(/^\/+/, '')
 }
 
 // 解析查询参数

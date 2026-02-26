@@ -342,11 +342,51 @@
   resize: vertical;
   outline: none;
   box-sizing: border-box;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .json-edit-textarea:focus {
   border-color: #42b983;
   box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.2);
+}
+
+/* contenteditable placeholder */
+.json-edit-textarea[contenteditable="true"]:empty:before,
+.json-edit-textarea[contenteditable="true"]:has(br:only-child):before {
+  content: attr(data-placeholder);
+  color: #6a6a6a;
+  pointer-events: none;
+}
+
+.json-edit-textarea[contenteditable="true"]:focus:empty:before,
+.json-edit-textarea[contenteditable="true"]:focus:has(br:only-child):before {
+  color: #888;
+}
+
+/* 确保高亮样式在编辑器中正确显示 */
+.json-edit-textarea .json-key {
+  color: #9cdcfe;
+  font-weight: bold;
+}
+
+.json-edit-textarea .json-string {
+  color: #ce9178;
+}
+
+.json-edit-textarea .json-number {
+  color: #b5cea8;
+}
+
+.json-edit-textarea .json-boolean {
+  color: #569cd6;
+  font-weight: bold;
+}
+
+.json-edit-textarea .json-null {
+  color: #569cd6;
+  font-weight: bold;
 }
 
 .edit-error-message {
