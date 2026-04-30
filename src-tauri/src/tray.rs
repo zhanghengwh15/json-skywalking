@@ -12,9 +12,16 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let tray_menu = Menu::with_items(app, &[&show, &quit])?;
 
     // 设置系统托盘
-    let _tray = TrayIconBuilder::new()
+    let mut tray_builder = TrayIconBuilder::new()
         .menu(&tray_menu)
-        .tooltip("DevTools")
+        .tooltip("DevTools");
+
+    // Windows 下如果不显式设置托盘图标，可能出现有占位但无图标的情况
+    if let Some(icon) = app.default_window_icon() {
+        tray_builder = tray_builder.icon(icon.clone());
+    }
+
+    let _tray = tray_builder
         .on_menu_event(move |app, event| {
             if let Some(window) = app.get_webview_window("main") {
                 match event.id().as_ref() {
