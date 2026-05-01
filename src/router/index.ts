@@ -17,6 +17,11 @@ const routes = [
     component: () => import('../views/HttpParser.vue')
   },
   {
+    path: '/cookie-bridge',
+    name: 'CookieBridge',
+    component: () => import('../views/CookieBridge.vue')
+  },
+  {
     path: '/:catchAll(.*)',
     redirect: '/json-parser'
   }

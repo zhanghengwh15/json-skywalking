@@ -29,6 +29,10 @@ tauri-plugin-global-shortcut = { version = "2.2.0" }
 arboard = "3.3.0"
 rand = "0.8.5"
 chrono = "0.4.34"
+rusqlite = { version = "0.31", features = ["bundled"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

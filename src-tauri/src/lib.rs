@@ -2,6 +2,7 @@
 
 // 引入模块
 mod clipboard;
+mod cookie_bridge;
 mod store;
 mod tray;
 
@@ -47,7 +48,10 @@ pub fn run() {
             store::load_sql_history,
             store::save_sql_history,
             store::load_json_history,
-            store::save_json_history
+            store::save_json_history,
+            // cookie_bridge commands
+            cookie_bridge::commands::cookie_bridge_list_domains,
+            cookie_bridge::commands::cookie_bridge_get_domain
         ])
         .on_window_event(|window, event| {
             tray::handle_window_event(window, event);
@@ -61,6 +65,11 @@ pub fn run() {
             // 设置全局快捷键
             #[cfg(desktop)]
             tray::setup_global_shortcut(app);
+
+            // 初始化 cookie_bridge
+            if let Err(e) = cookie_bridge::init(app) {
+                eprintln!("[cookie-bridge] 初始化失败: {}", e);
+            }
 
             Ok(())
         })
