@@ -1,7 +1,7 @@
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
-use crate::store::ParseRecord;
+use crate::desktop::store::ParseRecord;
 
 /// 获取剪贴板内容
 #[tauri::command]
@@ -102,7 +102,7 @@ async fn handle_http_content(app: &AppHandle, content: &str) -> Result<String, S
         title: Some(title.clone()),
     };
     
-    crate::store::save_parse_record_internal(app.clone(), record).await?;
+    crate::desktop::store::save_parse_record_internal(app.clone(), record).await?;
     
     app.emit("process-clipboard-done", "HTTP请求已格式化并写入剪贴板").ok();
     Ok("HTTP请求已格式化并写入剪贴板".to_string())
@@ -124,7 +124,7 @@ async fn handle_sql_content(app: &AppHandle, content: &str) -> Result<String, St
         clipboard.set_text(&formatted).ok();
     }
     
-    crate::store::save_sql_history_internal(app.clone(), content, &formatted).await?;
+    crate::desktop::store::save_sql_history_internal(app.clone(), content, &formatted).await?;
     
     println!("[Clipboard] SQL 格式化完成并已写入剪贴板.");
     app.emit("process-clipboard-done", "SQL已格式化并写入剪贴板").ok();

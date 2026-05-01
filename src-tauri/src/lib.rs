@@ -1,13 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "console")]
 
 // 引入模块
-mod clipboard;
 mod cookie_bridge;
-mod store;
-mod tray;
+mod desktop;
 
 // 重新导出需要的类型
-pub use store::{ParseRecord, SqlHistoryItem, JsonHistoryItem};
+pub use desktop::store::{ParseRecord, SqlHistoryItem, JsonHistoryItem};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -25,7 +23,7 @@ pub fn run() {
                     println!("[GlobalShortcut] 快捷键被触发");
                     let handle = _app.clone();
                     tauri::async_runtime::spawn(async move {
-                        if let Err(e) = clipboard::process_clipboard_content(handle).await {
+                        if let Err(e) = desktop::clipboard::process_clipboard_content(handle).await {
                             eprintln!("[GlobalShortcut] 处理剪贴板内容出错: {}", e);
                         } else {
                             println!("[GlobalShortcut] 剪贴板内容处理完成");
@@ -37,34 +35,34 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             // clipboard commands
-            clipboard::get_clipboard,
-            clipboard::global_clipboard_shortcut,
-            clipboard::process_clipboard_content,
+            desktop::clipboard::get_clipboard,
+            desktop::clipboard::global_clipboard_shortcut,
+            desktop::clipboard::process_clipboard_content,
             // store commands
-            store::save_parse_record,
-            store::get_parse_records,
-            store::delete_parse_record,
-            store::clear_parse_records,
-            store::load_sql_history,
-            store::save_sql_history,
-            store::load_json_history,
-            store::save_json_history,
+            desktop::store::save_parse_record,
+            desktop::store::get_parse_records,
+            desktop::store::delete_parse_record,
+            desktop::store::clear_parse_records,
+            desktop::store::load_sql_history,
+            desktop::store::save_sql_history,
+            desktop::store::load_json_history,
+            desktop::store::save_json_history,
             // cookie_bridge commands
             cookie_bridge::commands::cookie_bridge_list_domains,
             cookie_bridge::commands::cookie_bridge_get_domain
         ])
         .on_window_event(|window, event| {
-            tray::handle_window_event(window, event);
+            desktop::tray::handle_window_event(window, event);
         })
         .setup(|app| {
             // 设置系统托盘
-            if let Err(e) = tray::setup_tray(app) {
+            if let Err(e) = desktop::tray::setup_tray(app) {
                 eprintln!("[Tray] 设置系统托盘失败: {}", e);
             }
 
             // 设置全局快捷键
             #[cfg(desktop)]
-            tray::setup_global_shortcut(app);
+            desktop::tray::setup_global_shortcut(app);
 
             // 初始化 cookie_bridge
             if let Err(e) = cookie_bridge::init(app) {
@@ -76,6 +74,6 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            tray::handle_run_event(app_handle, &event);
+            desktop::tray::handle_run_event(app_handle, &event);
         });
 }
