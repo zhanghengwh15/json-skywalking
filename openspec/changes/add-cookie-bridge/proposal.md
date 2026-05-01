@@ -10,6 +10,7 @@
 - 新增 Vue 页面 `/cookie-bridge`，按域名分组展示当前 cookie 状态（左侧域名列表 + 右侧 cookie 表）
 - 写入完成后通过 Tauri Event 通知前端实时刷新
 - HTTP 服务启动失败（端口被占）时，发送托盘通知并记录日志，但 Tauri 主进程仍然正常启动，cookie-bridge 能力不可用
+- **新增 HTTP 查询端点**：`GET /domains` 返回所有域名列表，`GET /domains/:domain` 返回指定域名的 cookie 与 localStorage 详情，供内部 Go 应用直接通过 HTTP 消费数据，无需接触 SQLite 文件
 
 ## Capabilities
 

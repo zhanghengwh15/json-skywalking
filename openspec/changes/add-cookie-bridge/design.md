@@ -5,16 +5,27 @@ dev-tools 当前是一个 Tauri 2 桌面应用，已有托盘、剪贴板、JSON
 整体外部架构（dev-tools 仅承担中间一段）：
 
 ```
-┌─────────────┐  HTTP POST /push  ┌─────────────────┐  WAL 写  ┌─────────────┐
-│ Chrome 扩展 │ ────────────────▶ │ dev-tools (Tauri)│ ──────▶ │  data.db    │
-└─────────────┘                   │  axum + rusqlite │         │ (WAL 模式)  │
-                                  └─────────────────┘         └──────┬──────┘
-                                                                      │ 只读
-                                                                      ▼
-                                                              ┌─────────────┐
-                                                              │ Go 业务程序 │
-                                                              │ modernc.org │
-                                                              └─────────────┘
+                         HTTP POST /push
+┌─────────────┐ ──────────────────────────────▶ ┌─────────────────┐
+│ Chrome 扩展 │                                 │ dev-tools (Tauri)│
+│  (上游写入) │                                 │  axum + rusqlite │
+└─────────────┘                                 └────────┬────────┘
+                                                         │ WAL 写
+                                                         ▼
+                                                  ┌─────────────┐
+                                                  │   data.db   │
+                                                  │  (WAL 模式) │
+                                                  └──────┬──────┘
+                                                         │
+              ┌──────────────────────────────────────────┤
+              │                                          │
+              │  HTTP GET /domains                       │ 只读
+              │  HTTP GET /domains/:domain               │ (可选)
+              ▼                                          ▼
+       ┌─────────────┐                           ┌─────────────┐
+       │ Go 业务程序 │                           │ Go 业务程序 │
+       │ (HTTP 查询) │                           │ (SQLite 直连)│
+       └─────────────┘                           └─────────────┘
 ```
 
 约束：
@@ -25,7 +36,7 @@ dev-tools 当前是一个 Tauri 2 桌面应用，已有托盘、剪贴板、JSON
 ## Goals / Non-Goals
 
 **Goals:**
-- 在 `127.0.0.1:8765` 提供 `POST /push` 与 `GET /health` 两个端点
+- 在 `127.0.0.1:8765` 提供 `POST /push`、`GET /health`、`GET /domains`、`GET /domains/:domain` 端点
 - SQLite schema 简洁、仅保留每个 (domain, name, path) 的最新状态；写入用事务做"按域名镜像"
 - 数据库路径在 Tauri `app_data_dir()` 下，与现有 `sql_history.json` 同目录，便于统一备份和迁移
 - 前端 `/cookie-bridge` 页面：左侧域名列表 + 右侧当前 cookie 表，写入后实时刷新
@@ -65,11 +76,17 @@ dev-tools 当前是一个 Tauri 2 桌面应用，已有托盘、剪贴板、JSON
   - 历史版本：表结构复杂，超出本次需求
 - **理由**：UI 是"状态视角"，必须等价于浏览器当前状态。镜像写入让"扩展推什么 = 桥就有什么"，无歧义。事务保证不会出现中间态被读取
 
-### D4. UI ↔ Rust 通信：Tauri command（不直连 HTTP）
+### D4. 查询通道分层
 
+**前端 → Rust：Tauri command（不走 HTTP）**
 - **选择**：前端 `invoke('cookie_bridge_list_domains')` / `invoke('cookie_bridge_get_domain', { domain })`
-- **替代方案**：前端直接 `fetch('http://127.0.0.1:8765/cookies')`
-- **理由**：HTTP server 的角色是"接收外部推送"，不应同时承担"给本应用 UI 做查询"。两条数据通道职责分离，避免把内部接口暴露给浏览器进程。Tauri command 走 IPC，无网络开销
+- **替代方案**：前端直接 `fetch('http://127.0.0.1:8765/domains')`
+- **理由**：前端是 dev-tools 内部组件，走 Tauri IPC 零网络开销；HTTP 端点面向外部进程（Go 应用），职责分离
+
+**Go 应用 → HTTP 查询端点（不走 SQLite）**
+- **选择**：Go 应用通过 `GET /domains` 和 `GET /domains/:domain` 查询数据
+- **替代方案**：Go 应用直接只读打开 SQLite 文件
+- **理由**：HTTP 查询让 Go 侧零依赖（无需 SQLite 驱动、无需关心 WAL 兼容性、无需知道 `data.db` 的绝对路径），降低集成成本；SQLite 直连作为备选方案保留
 
 ### D5. 实时刷新：Tauri Event
 
@@ -123,5 +140,4 @@ DB 连接放进 Tauri 的 `State<Mutex<Connection>>`，HTTP handler 通过 axum 
 
 ## Open Questions
 
-- Go 端如何获知 `data.db` 的绝对路径？（环境变量 / 配置文件 / 固定相对路径？）—— 这是 Go 侧的事，本变更只承诺路径稳定性
 - 是否需要在前端页面提供"导出当前所有数据为 JSON"的辅助功能？—— 暂不做，等真实使用反馈

@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -36,6 +36,8 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/push", post(push_handler))
+        .route("/domains", get(list_domains_handler))
+        .route("/domains/:domain", get(get_domain_handler))
         .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state)
 }
@@ -77,6 +79,51 @@ async fn push_handler(
             )
                 .into_response()
         }
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("db error: {}", e),
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("task error: {}", e),
+            }),
+        )
+            .into_response(),
+    }
+}
+
+async fn list_domains_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let db = state.db.clone();
+    match task::spawn_blocking(move || db.list_domains()).await {
+        Ok(Ok(domains)) => (StatusCode::OK, Json(domains)).into_response(),
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("db error: {}", e),
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("task error: {}", e),
+            }),
+        )
+            .into_response(),
+    }
+}
+
+async fn get_domain_handler(
+    State(state): State<AppState>,
+    Path(domain): Path<String>,
+) -> impl IntoResponse {
+    let db = state.db.clone();
+    match task::spawn_blocking(move || db.get_domain(&domain)).await {
+        Ok(Ok(snapshot)) => (StatusCode::OK, Json(snapshot)).into_response(),
         Ok(Err(e)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {

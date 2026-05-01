@@ -94,6 +94,49 @@
 - **WHEN** 当前 DB 中没有任何域
 - **THEN** 页面显示空状态提示文案，告知用户 cookie 桥已就绪、等待扩展推送
 
+### Requirement: 下游查询端点（HTTP）
+HTTP 服务 SHALL 提供两个 GET 端点供内部 Go 应用查询已持久化的 cookie / localStorage 数据。端点仅监听 `127.0.0.1`，无鉴权要求。
+
+#### Scenario: 列出所有域名
+- **WHEN** Go 应用向 `http://127.0.0.1:8765/domains` 发起 GET 请求
+- **THEN** 服务返回 HTTP 200，响应体为 JSON 数组，包含所有不重复的域名，按各域 `MAX(updated_at)` 倒序排列，例如 `["example.com","test.com"]`
+
+#### Scenario: 查询某域详情
+- **WHEN** Go 应用向 `http://127.0.0.1:8765/domains/example.com` 发起 GET 请求
+- **THEN** 服务返回 HTTP 200，响应体为 JSON 对象：
+  ```json
+  {
+    "cookies": [
+      {
+        "domain": "example.com",
+        "name": "sid",
+        "path": "/",
+        "value": "abc123",
+        "expires": 1700000000,
+        "secure": 1,
+        "httpOnly": 1,
+        "updatedAt": 1700000000000
+      }
+    ],
+    "localStorage": [
+      {
+        "domain": "example.com",
+        "key": "user_id",
+        "value": "42",
+        "updatedAt": 1700000000000
+      }
+    ]
+  }
+  ```
+
+#### Scenario: 查询不存在的域名
+- **WHEN** Go 应用查询一个 DB 中不存在的域名
+- **THEN** 服务返回 HTTP 200，响应体为 `{"cookies":[],"localStorage":[]}`，不抛错
+
+#### Scenario: DB 查询失败
+- **WHEN** `/domains` 或 `/domains/:domain` 在查询 SQLite 时发生错误
+- **THEN** 服务返回 HTTP 500，响应体为 `{"error":"db error: ..."}`
+
 ### Requirement: 跨源访问支持
 HTTP 服务 SHALL 配置 CORS 中间件，允许任意 Origin、任意常用方法（GET、POST、OPTIONS）、任意常用请求头，以确保 Chrome 扩展的 background script 能成功跨源调用。
 

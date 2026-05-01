@@ -23,7 +23,9 @@
 - [x] 3.3 构建 axum `Router`：`POST /push`、`GET /health`，挂载 `tower_http::cors::CorsLayer::permissive()`
 - [x] 3.4 实现 `health_handler` 直接返回 `"ok"`
 - [x] 3.5 实现 `push_handler`：从 `State` 取 `Db` 与 `AppHandle`；用 `spawn_blocking` 调 `db.push(...)`；成功后 `app_handle.emit("cookie-bridge:updated", &payload.domain)`；返回 `PushResponse { ok, cookies, local_storage }`
-- [x] 3.6 实现 `pub async fn serve(addr: SocketAddr, state: AppState) -> Result<(), io::Error>`：`TcpListener::bind` + `axum::serve(...)`；调用方判断 bind 错误
+- [x] 3.6 新增 `GET /domains` 端点：实现 `list_domains_handler`，`spawn_blocking` 调 `db.list_domains()`，返回 JSON 数组
+- [x] 3.7 新增 `GET /domains/:domain` 端点：实现 `get_domain_handler`，`spawn_blocking` 调 `db.get_domain()`，返回 `DomainSnapshot` JSON
+- [x] 3.8 实现 `pub async fn serve(addr: SocketAddr, state: AppState) -> Result<(), io::Error>`：`TcpListener::bind` + `axum::serve(...)`；调用方判断 bind 错误
 
 ## 4. Tauri commands (`cookie_bridge/commands.rs`)
 
@@ -60,6 +62,8 @@
 - [ ] 8.3 `curl -X POST http://127.0.0.1:8765/push -H "Content-Type: application/json" -d '{"domain":"test.com","cookies":[{"domain":"test.com","name":"sid","value":"abc","path":"/","expires":0,"secure":0,"http_only":0}],"local_storage":null,"ts":1700000000000}'` 返回 `{"ok":true,"cookies":1,"local_storage":0}`
 - [ ] 8.4 在浏览器访问 `/cookie-bridge`，验证 `test.com` 出现在左侧列表，右侧显示 `sid=abc`
 - [ ] 8.5 再次推送同域但只携带 `uid`，验证 UI 自动刷新且 `sid` 已不存在（镜像语义生效）
-- [ ] 8.6 用 SQLite 客户端打开 `app_data_dir/data.db`，确认 `cookies` 与 `local_storage` 表存在、WAL 模式生效（同目录有 `data.db-wal` 和 `data.db-shm`）
-- [ ] 8.7 在 dev-tools 运行时启动一个 Go 小程序（或用 `sqlite3` CLI）只读打开同一文件 `SELECT * FROM cookies`，确认能读出数据且不报锁错
-- [ ] 8.8 故意先用 `python -m http.server 8765` 占住端口，再启动 dev-tools，确认主程序仍能启动、托盘正常、出现"端口被占"通知或日志
+- [ ] 8.6 `curl http://127.0.0.1:8765/domains` 返回 `["test.com"]`
+- [ ] 8.7 `curl http://127.0.0.1:8765/domains/test.com` 返回包含 `cookies` 和 `localStorage` 的 JSON
+- [ ] 8.8 用 SQLite 客户端打开 `app_data_dir/data.db`，确认 `cookies` 与 `local_storage` 表存在、WAL 模式生效（同目录有 `data.db-wal` 和 `data.db-shm`）
+- [ ] 8.9 在 dev-tools 运行时启动一个 Go 小程序（或用 `sqlite3` CLI）只读打开同一文件 `SELECT * FROM cookies`，确认能读出数据且不报锁错
+- [ ] 8.10 故意先用 `python -m http.server 8765` 占住端口，再启动 dev-tools，确认主程序仍能启动、托盘正常、出现"端口被占"通知或日志
