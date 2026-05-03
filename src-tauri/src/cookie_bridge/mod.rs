@@ -2,6 +2,9 @@ pub mod commands;
 pub mod db;
 pub mod http;
 
+use log::LevelFilter;
+use simplelog::{CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
+use std::fs::OpenOptions;
 use tauri::Manager;
 
 use db::Db;
@@ -9,6 +12,28 @@ use db::Db;
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_data_dir = app.path().app_data_dir()?;
     std::fs::create_dir_all(&app_data_dir)?;
+
+    let log_path = app_data_dir.join("cookie-bridge.log");
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
+
+    let config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .build();
+
+    let _ = CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Info,
+            config.clone(),
+            TerminalMode::Mixed,
+            simplelog::ColorChoice::Auto,
+        ),
+        WriteLogger::new(LevelFilter::Info, config, log_file),
+    ]);
+
+    log::info!("[CookieBridge] 日志初始化完成: {:?}", log_path);
 
     let db_path = app_data_dir.join("data.db");
     let db = Db::open(&db_path)?;
@@ -26,7 +51,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
         if let Err(e) = http::serve(addr, state).await {
             let msg = format!("Cookie 桥不可用：端口 8765 被占 ({e})");
-            eprintln!("[cookie-bridge] {}", msg);
+            log::error!("[cookie-bridge] {}", msg);
 
             #[cfg(desktop)]
             {

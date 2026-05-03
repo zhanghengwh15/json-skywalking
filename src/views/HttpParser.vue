@@ -1,22 +1,26 @@
 <template>
   <div class="http-parser">
-    <div class="header">
-      <h1>HTTP 请求解析工具</h1>
-      <p>支持HTTP请求解析，使用Ctrl+V快速生成curl命令</p>
+    <div class="tool-header">
+      <div class="tool-header-left">
+        <h1>HTTP 请求解析工具</h1>
+        <p>支持HTTP请求解析，使用Ctrl+V快速生成curl命令</p>
+      </div>
+      <div class="tool-actions">
+        <button @click="toggleHistory" class="history-btn-inline">
+          {{ showHistory ? '隐藏历史' : '查看历史' }}
+        </button>
+      </div>
     </div>
-    
+
     <div class="content">
       <div class="input-section">
         <div class="section-header">
-          <h3>输入请求信息</h3>
+          <h3><span class="material-icons">edit_note</span> 输入请求信息</h3>
           <div class="actions">
             <button @click="parseRequest" :disabled="loading" class="parse-btn">
               {{ loading ? '解析中...' : '生成 cURL' }}
             </button>
             <button @click="clearInput" class="clear-btn">清空</button>
-            <button @click="toggleHistory" class="history-btn">
-              {{ showHistory ? '隐藏历史' : '查看历史' }}
-            </button>
           </div>
         </div>
         <textarea
@@ -29,7 +33,7 @@
       
       <div class="output-section">
         <div class="section-header">
-          <h3>生成的 cURL 命令</h3>
+          <h3><span class="material-icons">terminal</span> 生成的 cURL 命令</h3>
           <div class="actions">
             <button @click="copyToClipboard" :disabled="!curlCommand" class="copy-btn">
               复制命令

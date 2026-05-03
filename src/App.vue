@@ -1,158 +1,407 @@
 <script setup lang="ts">
-// 移除未使用的import
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+interface NavItem {
+  path: string
+  name: string
+  icon: string
+}
+
+const navItems: NavItem[] = [
+  { path: '/json-parser', name: 'JSON解析', icon: 'data_object' },
+  { path: '/sql-parser', name: 'SQL解析', icon: 'storage' },
+  { path: '/http-parser', name: 'HTTP解析', icon: 'http' },
+  { path: '/cookie-bridge', name: 'Cookie桥', icon: 'cookie' },
+]
+
+const currentNavName = computed(() => {
+  const item = navItems.find(item => item.path === route.path)
+  return item?.name || '开发工具箱'
+})
+
+const isActive = (path: string) => route.path === path
 </script>
 
 <template>
   <div id="app">
-    <nav class="tab-navigation">
-      <router-link to="/json-parser" class="tab-item">
-        <span class="tab-icon">🔧</span>
-        <span class="tab-text">JSON解析</span>
-      </router-link>
-      <router-link to="/sql-parser" class="tab-item">
-        <span class="tab-icon">🗃️</span>
-        <span class="tab-text">SQL解析</span>
-      </router-link>
-      <router-link to="/http-parser" class="tab-item">
-        <span class="tab-icon">🌐</span>
-        <span class="tab-text">HTTP解析</span>
-      </router-link>
-    </nav>
+    <!-- SideNavBar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">开发工具箱</div>
+      <nav class="sidebar-nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          :class="['nav-item', { active: isActive(item.path) }]"
+        >
+          <span class="nav-icon material-icons">{{ item.icon }}</span>
+          <span class="nav-text">{{ item.name }}</span>
+        </router-link>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
     <main class="main-content">
-      <router-view></router-view>
+      <!-- TopAppBar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="breadcrumb">
+            <span class="breadcrumb-text">{{ currentNavName }}</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span class="version-tag">v0.1.0</span>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="page-content">
+        <router-view />
+      </div>
     </main>
   </div>
 </template>
 
 <style>
-/* 全局样式 - 确保页面填充整个窗口 */
-html,
-body,
-#app {
+/* ========== 全局重置与主题变量 ========== */
+html, body, #app {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* 防止出现不必要的滚动条 */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  overflow: hidden;
+}
+
+:root {
+  --bg-primary: #131315;
+  --bg-secondary: #1b1b1d;
+  --bg-tertiary: #201f21;
+  --bg-elevated: #2a2a2c;
+  --bg-card: #1e1e20;
+
+  --text-primary: #e5e1e4;
+  --text-secondary: #cdc2d7;
+  --text-muted: #968da0;
+  --text-disabled: #6a6a6a;
+
+  --accent-primary: #d6baff;
+  --accent-secondary: #adc6ff;
+  --accent-tertiary: #ffafd3;
+
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-hover: rgba(255,255,255,0.15);
+
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-/* 全局 box-sizing 和 margin/padding reset */
 *, *::before, *::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
-/* 让 #app 使用 flex 布局 */
+/* ========== 布局框架 ========== */
 #app {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  background: var(--bg-primary);
 }
 
-.main-content {
-  height: auto;
-  min-height: 0;
-  flex: 1 1 auto;
+/* ========== 侧边栏 ========== */
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background: rgba(19, 19, 21, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
+  padding: 20px 14px;
+  z-index: 50;
 }
 
-/* 兼容所有页面根容器（如 .json-parser） */
-.json-parser {
-  height: 100%;
-  min-height: 0;
+.sidebar-brand {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 28px;
+  padding: 0 10px;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-nav {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
-.tab-navigation {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 0;
-  display: flex;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.tab-item {
+.nav-item {
   display: flex;
   align-items: center;
-  padding: 15px 25px;
-  color: rgba(255, 255, 255, 0.8);
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: var(--text-muted);
   text-decoration: none;
+  font-size: 13px;
   font-weight: 500;
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
-  flex: 1;
+  letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+}
+
+.nav-item.active {
+  color: var(--accent-primary);
+  background: rgba(214, 186, 255, 0.10);
+  border-color: rgba(214, 186, 255, 0.20);
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 20px;
+  width: 24px;
+  min-width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+}
+
+.nav-text {
+  font-size: 13px;
+}
+
+/* ========== 主内容区 ========== */
+.main-content {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ========== 顶部栏 ========== */
+.topbar {
+  height: var(--topbar-height);
+  width: 100%;
+  background: rgba(19, 19, 21, 0.60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-default);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 40;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  height: 60px;
-  box-sizing: border-box;
 }
 
-.tab-item:hover {
-  color: white;
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.tab-item.router-link-exact-active {
-  color: white;
-  border-bottom-color: #42b983;
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.tab-icon {
-  font-size: 18px;
-}
-
-.tab-text {
+.breadcrumb-text {
   font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-/* 响应式设计 - 针对不同屏幕尺寸的优化 */
-@media (max-width: 1200px) {
-  /* 中等屏幕 */
-  .json-parser {
-    max-width: 100% !important;
-  }
+.version-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.05);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 500;
 }
 
+/* ========== 页面内容区 ========== */
+.page-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ========== 通用玻璃面板 ========== */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-default);
+  border-top-color: var(--border-hover);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
+}
+
+.glass-panel-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px 12px 0 0;
+}
+
+.glass-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.glass-panel-title .material-icons {
+  font-size: 18px;
+  color: var(--accent-primary);
+}
+
+/* ========== 通用按钮 ========== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+}
+
+.btn:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #430089;
+  border: none;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  opacity: 0.90;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-hover);
+}
+
+/* ========== 滚动条 ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* ========== 响应式 ========== */
 @media (max-width: 768px) {
-  /* 小屏幕 */
-  .content {
-    grid-template-columns: 1fr !important;
-    gap: 10px !important;
+  .sidebar {
+    width: 60px;
+    padding: 16px 8px;
   }
-  
-  .section-header {
-    padding: 10px 15px !important;
+
+  .sidebar-brand {
+    display: none;
   }
-  
-  .actions {
-    flex-direction: column !important;
-    gap: 5px !important;
+
+  .nav-text {
+    display: none;
+  }
+
+  .nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .main-content {
+    margin-left: 60px;
+  }
+
+  :root {
+    --sidebar-width: 60px;
   }
 }
 
-/* 高分辨率屏幕优化 */
-@media (min-width: 1920px) {
-  /* 4K或更大屏幕 */
-  .json-parser {
-    font-size: 16px;
-  }
-  
-  .json-tree {
-    font-size: 15px;
-  }
-  
-  .section-header h3 {
-    font-size: 18px;
-  }
+/* ========== Material Icons 字体加载 ========== */
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url(https://fonts.gstatic.com/s/materialicons/v142/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');
+}
+
+.material-icons {
+  font-family: 'Material Icons', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  vertical-align: middle;
 }
 </style>

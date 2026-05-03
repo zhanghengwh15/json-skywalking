@@ -1,19 +1,28 @@
 <template>
   <div class="json-parser">
-    <div class="header">
-      <h1>JSON 解析与格式化工具</h1>
-      <p>使用快捷键或按钮从剪贴板加载JSON数据（支持带注释和多余逗号的JSON）</p>
+    <div class="tool-header">
+      <div class="tool-header-left">
+        <h1>JSON 解析与格式化工具</h1>
+        <p>使用快捷键或按钮从剪贴板加载JSON数据（支持带注释和多余逗号的JSON）</p>
+      </div>
+      <div class="tool-actions">
+        <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'">
+          <span>获取剪贴板</span><span class="shortcut-hint">⌘⇧G</span><span class="global-indicator">🌍</span>
+        </button>
+        <button @click="toggleHistory" class="history-btn">
+          历史记录 ({{ historyList.length }})
+        </button>
+      </div>
     </div>
     <div class="content">
       <div class="input-section">
         <div class="section-header">
-          <h3>JSON 结构视图</h3>
+          <h3><span class="material-icons">account_tree</span> JSON 结构视图</h3>
           <div class="actions">
-            <button @click="getClipboardContent" class="clipboard-btn" :title="'获取剪贴板 (全局快捷键: ⌘⇧G)'"><span>获取剪贴板</span><span class="shortcut-hint">⌘⇧G</span><span class="global-indicator">🌍</span></button>
             <input
               v-model="searchText"
               placeholder="搜索 key 或 value..."
-              style="background: #23272f; color: #e0e0e0; border: 1.5px solid #333a45; border-radius: 6px; padding: 6px 12px; font-size: 15px; min-width: 180px; outline: none; margin-left: 12px;"
+              class="search-input"
             />
           </div>
         </div>
@@ -48,13 +57,13 @@
       
       <div class="output-section">
         <div class="section-header">
-          <h3>值内容</h3>
+          <h3><span class="material-icons">data_object</span> 值内容</h3>
           <div class="actions">
-            <button 
-              v-if="isEditing && selectedKeyPath.length > 0" 
-              @click="() => saveEditedValue(false)" 
-              :disabled="!parsedJson || !isEditing" 
-              class="save-btn" 
+            <button
+              v-if="isEditing && selectedKeyPath.length > 0"
+              @click="() => saveEditedValue(false)"
+              :disabled="!parsedJson || !isEditing"
+              class="save-btn-inline"
               title="保存编辑 (⌘S / Ctrl+S)"
             >
               保存编辑
@@ -66,9 +75,6 @@
             </button>
             <button @click="escapeClipboardJson" class="copy-btn" title="从剪贴板获取数据并转义引号">
               转义剪贴板
-            </button>
-            <button @click="toggleHistory" class="history-btn">
-              历史记录 ({{ historyList.length }})
             </button>
           </div>
         </div>

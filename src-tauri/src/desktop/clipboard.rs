@@ -1,5 +1,5 @@
 use arboard::Clipboard;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use crate::desktop::store::ParseRecord;
 

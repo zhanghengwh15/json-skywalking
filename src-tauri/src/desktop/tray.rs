@@ -1,6 +1,6 @@
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
+    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
     Manager, WindowEvent,
 };
 
@@ -12,9 +12,11 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let tray_menu = Menu::with_items(app, &[&show, &quit])?;
 
     // 设置系统托盘
+    // show_menu_on_left_click(false) 避免左键释放时弹出菜单与 show/hide 冲突
     let mut tray_builder = TrayIconBuilder::new()
         .menu(&tray_menu)
-        .tooltip("DevTools");
+        .tooltip("DevTools")
+        .show_menu_on_left_click(false);
 
     // Windows 下如果不显式设置托盘图标，可能出现有占位但无图标的情况
     if let Some(icon) = app.default_window_icon() {
@@ -41,28 +43,39 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                ..
-            } = event
-            {
-                let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    let is_visible = window.is_visible().unwrap();
-                    if is_visible {
-                        window.hide().unwrap();
+            // 只处理左键释放的 Click 事件；忽略 Down(按下) 和 DoubleClick，
+            // 防止 Windows 同时触发多个事件导致窗口状态抖动
+            let is_left_click_up = matches!(
+                event,
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                }
+            );
+            if !is_left_click_up {
+                return;
+            }
+
+            let app = tray.app_handle();
+            if let Some(window) = app.get_webview_window("main") {
+                match window.is_visible() {
+                    Ok(true) => {
+                        let _ = window.hide();
                         #[cfg(target_os = "windows")]
                         {
-                            window.set_skip_taskbar(true).unwrap();
+                            let _ = window.set_skip_taskbar(true);
                         }
-                    } else {
-                        #[cfg(target_os = "windows")]
-                        {
-                            window.set_skip_taskbar(false).unwrap();
-                        }
-                        window.show().unwrap();
-                        window.set_focus().unwrap();
                     }
+                    Ok(false) => {
+                        #[cfg(target_os = "windows")]
+                        {
+                            let _ = window.set_skip_taskbar(false);
+                        }
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                    Err(_) => {}
                 }
             }
         })
@@ -78,9 +91,9 @@ pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {
             api.prevent_close();
             #[cfg(target_os = "windows")]
             {
-                window.set_skip_taskbar(true).unwrap();
+                let _ = window.set_skip_taskbar(true);
             }
-            window.hide().unwrap();
+            let _ = window.hide();
         }
         _ => {}
     }

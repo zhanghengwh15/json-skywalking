@@ -9,9 +9,9 @@ pub struct PushCookie {
     pub name: String,
     pub value: String,
     pub path: String,
-    pub expires: i64,
-    pub secure: i32,
-    pub http_only: i32,
+    pub expires: f64,
+    pub secure: bool,
+    pub http_only: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,8 +36,8 @@ pub struct CookieItem {
     pub path: String,
     pub value: String,
     pub expires: i64,
-    pub secure: i32,
-    pub http_only: i32,
+    pub secure: bool,
+    pub http_only: bool,
     pub updated_at: i64,
 }
 
@@ -64,6 +64,7 @@ pub struct Db {
 
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
+        log::info!("[CookieBridge DB] 打开数据库: {:?}", path);
         let conn = Connection::open(path)?;
         conn.execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -98,13 +99,26 @@ impl Db {
     }
 
     pub fn push(&self, payload: &PushPayload) -> Result<(usize, usize)> {
+        log::info!(
+            "[CookieBridge DB] push 开始: domain={}, cookies={}, local_storage={}, ts={}",
+            payload.domain,
+            payload.cookies.as_ref().map_or(0, |v| v.len()),
+            payload.local_storage.as_ref().map_or(0, |v| v.len()),
+            payload.ts
+        );
+
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction()?;
 
         let cookie_count = if let Some(cookies) = &payload.cookies {
-            tx.execute("DELETE FROM cookies WHERE domain=?1", [&payload.domain])?;
+            let deleted = tx.execute("DELETE FROM cookies WHERE domain=?1", [&payload.domain])?;
+            log::info!("[CookieBridge DB] 删除旧 cookies: domain={}, 删除条数={}", payload.domain, deleted);
             let mut count = 0;
             for c in cookies {
+                log::info!(
+                    "[CookieBridge DB] 写入 cookie: domain={}, name={}, path={}, expires={}, secure={}, http_only={}",
+                    c.domain, c.name, c.path, c.expires as i64, c.secure as i32, c.http_only as i32
+                );
                 tx.execute(
                     "INSERT INTO cookies (domain, name, path, value, expires, secure, http_only, updated_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
@@ -115,7 +129,7 @@ impl Db {
                         http_only=excluded.http_only,
                         updated_at=excluded.updated_at",
                     params![
-                        c.domain, c.name, c.path, c.value, c.expires, c.secure, c.http_only,
+                        c.domain, c.name, c.path, c.value, c.expires as i64, c.secure, c.http_only,
                         payload.ts
                     ],
                 )?;
@@ -127,9 +141,14 @@ impl Db {
         };
 
         let ls_count = if let Some(ls) = &payload.local_storage {
-            tx.execute("DELETE FROM local_storage WHERE domain=?1", [&payload.domain])?;
+            let deleted = tx.execute("DELETE FROM local_storage WHERE domain=?1", [&payload.domain])?;
+            log::info!("[CookieBridge DB] 删除旧 local_storage: domain={}, 删除条数={}", payload.domain, deleted);
             let mut count = 0;
             for item in ls {
+                log::info!(
+                    "[CookieBridge DB] 写入 local_storage: domain={}, key={}",
+                    payload.domain, item.key
+                );
                 tx.execute(
                     "INSERT INTO local_storage (domain, key, value, updated_at)
                      VALUES (?1, ?2, ?3, ?4)
@@ -146,10 +165,15 @@ impl Db {
         };
 
         tx.commit()?;
+        log::info!(
+            "[CookieBridge DB] push 完成: domain={}, 写入 cookies={}, 写入 local_storage={}",
+            payload.domain, cookie_count, ls_count
+        );
         Ok((cookie_count, ls_count))
     }
 
     pub fn list_domains(&self) -> Result<Vec<String>> {
+        log::info!("[CookieBridge DB] list_domains 查询开始");
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT domain FROM (
@@ -159,10 +183,13 @@ impl Db {
             ) GROUP BY domain ORDER BY MAX(max_ts) DESC",
         )?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
-        rows.collect()
+        let domains: Vec<String> = rows.collect::<Result<Vec<_>>>()?;
+        log::info!("[CookieBridge DB] list_domains 查询完成: 共 {} 个域名", domains.len());
+        Ok(domains)
     }
 
     pub fn get_domain(&self, domain: &str) -> Result<DomainSnapshot> {
+        log::info!("[CookieBridge DB] get_domain 查询开始: domain={}", domain);
         let conn = self.conn.lock().unwrap();
 
         let mut cookie_stmt = conn.prepare(
@@ -199,6 +226,12 @@ impl Db {
             })?
             .collect::<Result<Vec<_>>>()?;
 
+        log::info!(
+            "[CookieBridge DB] get_domain 查询完成: domain={}, cookies={}, local_storage={}",
+            domain,
+            cookies.len(),
+            local_storage.len()
+        );
         Ok(DomainSnapshot {
             cookies,
             local_storage,
