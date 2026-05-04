@@ -1,29 +1,80 @@
 use rusqlite::{params, Connection, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PushCookie {
     pub domain: String,
     pub name: String,
     pub value: String,
+    #[serde(default)]
     pub path: String,
-    pub expires: f64,
+    #[serde(alias = "expirationDate", default)]
+    pub expires: Option<f64>,
     pub secure: bool,
     pub http_only: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PushLocalStorage {
     pub key: String,
     pub value: String,
 }
 
+fn deserialize_local_storage<'de, D>(deserializer: D) -> Result<Option<Vec<PushLocalStorage>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    log::info!("[CookieBridge DB] deserialize_local_storage 收到: {:?}", value.as_ref().map(|v| v.to_string().len()));
+    match value {
+        None => {
+            log::info!("[CookieBridge DB] deserialize_local_storage: None");
+            Ok(None)
+        }
+        Some(serde_json::Value::Array(arr)) => {
+            log::info!("[CookieBridge DB] deserialize_local_storage: 数组格式, len={}", arr.len());
+            let items: Vec<PushLocalStorage> = arr
+                .into_iter()
+                .map(|v| serde_json::from_value(v).map_err(serde::de::Error::custom))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Some(items))
+        }
+        Some(serde_json::Value::Object(map)) => {
+            log::info!("[CookieBridge DB] deserialize_local_storage: 对象格式, keys={}", map.len());
+            let items: Vec<PushLocalStorage> = map
+                .into_iter()
+                .map(|(k, v)| {
+                    let val_str = match v {
+                        serde_json::Value::String(s) => s,
+                        other => other.to_string(),
+                    };
+                    PushLocalStorage {
+                        key: k,
+                        value: val_str,
+                    }
+                })
+                .collect();
+            Ok(Some(items))
+        }
+        Some(other) => {
+            log::error!("[CookieBridge DB] deserialize_local_storage: 未知格式: {:?}", other);
+            Err(serde::de::Error::custom(
+                "local_storage must be an array or object",
+            ))
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PushPayload {
     pub domain: String,
     pub cookies: Option<Vec<PushCookie>>,
+    #[serde(default, deserialize_with = "deserialize_local_storage", alias = "local_storage")]
     pub local_storage: Option<Vec<PushLocalStorage>>,
     pub ts: i64,
 }
@@ -115,9 +166,10 @@ impl Db {
             log::info!("[CookieBridge DB] 删除旧 cookies: domain={}, 删除条数={}", payload.domain, deleted);
             let mut count = 0;
             for c in cookies {
+                let expires_i64 = c.expires.unwrap_or(0.0) as i64;
                 log::info!(
-                    "[CookieBridge DB] 写入 cookie: domain={}, name={}, path={}, expires={}, secure={}, http_only={}",
-                    c.domain, c.name, c.path, c.expires as i64, c.secure as i32, c.http_only as i32
+                    "[CookieBridge DB] 写入 cookie: domain={}, name={}, path={}, expires={:?}, secure={}, http_only={}",
+                    c.domain, c.name, c.path, c.expires, c.secure as i32, c.http_only as i32
                 );
                 tx.execute(
                     "INSERT INTO cookies (domain, name, path, value, expires, secure, http_only, updated_at)
@@ -129,7 +181,7 @@ impl Db {
                         http_only=excluded.http_only,
                         updated_at=excluded.updated_at",
                     params![
-                        c.domain, c.name, c.path, c.value, c.expires as i64, c.secure, c.http_only,
+                        c.domain, c.name, c.path, c.value, expires_i64, c.secure, c.http_only,
                         payload.ts
                     ],
                 )?;

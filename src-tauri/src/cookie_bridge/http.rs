@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use tower_http::limit::RequestBodyLimitLayer;
 use serde::Serialize;
 use std::io;
 use std::net::SocketAddr;
@@ -38,6 +39,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/push", post(push_handler))
         .route("/domains", get(list_domains_handler))
         .route("/domains/:domain", get(get_domain_handler))
+        .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB
         .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state)
 }

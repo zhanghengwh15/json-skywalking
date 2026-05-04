@@ -32,7 +32,7 @@ rand = "0.8.5"
 chrono = "0.4.34"
 rusqlite = { version = "0.31", features = ["bundled"] }
 axum = "0.7"
-tower-http = { version = "0.5", features = ["cors"] }
+tower-http = { version = "0.5", features = ["cors", "limit"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 log = "0.4"
 simplelog = "0.12"
