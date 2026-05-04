@@ -5,6 +5,15 @@
         <h1>Cookie Bridge</h1>
         <p>查看 Chrome 扩展推送的 Cookie 和 LocalStorage 数据</p>
       </div>
+      <button
+        class="debug-toggle"
+        :class="{ active: debugMode }"
+        @click="toggleDebug"
+        title="切换 Debug 日志模式"
+      >
+        <span class="material-icons">bug_report</span>
+        {{ debugMode ? 'Debug ON' : 'Debug' }}
+      </button>
     </div>
     <div class="content">
       <div class="domain-sidebar">
@@ -73,7 +82,22 @@
               <tbody>
                 <tr v-for="ls in currentDomain.localStorage" :key="ls.key">
                   <td class="mono">{{ ls.key }}</td>
-                  <td class="mono">{{ ls.value }}</td>
+                  <td class="mono value-cell">
+                    <div class="value-wrap">
+                      <span class="value-text">{{ formatValue(ls.value, ls.key) }}</span>
+                      <span v-if="ls.value.length > MAX_LENGTH" class="show-more" @click.stop="toggleExpand(ls.key)">
+                        {{ isExpanded(ls.key) ? 'show less' : 'show more' }}
+                      </span>
+                    </div>
+                    <button
+                      v-if="isJson(ls.value)"
+                      class="copy-btn"
+                      title="复制"
+                      @click.stop="copyText(ls.value)"
+                    >
+                      <span class="material-icons">content_copy</span>
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -92,6 +116,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+
+const debugMode = ref(false)
+
+async function toggleDebug() {
+  debugMode.value = !debugMode.value
+  await invoke('cookie_bridge_set_debug_mode', { enabled: debugMode.value })
+}
 
 interface CookieItem {
   domain: string
@@ -120,6 +151,45 @@ const domains = ref<string[]>([])
 const selectedDomain = ref<string>('')
 const currentDomain = ref<DomainSnapshot>({ cookies: [], localStorage: [] })
 let unlisten: UnlistenFn | null = null
+
+const MAX_LENGTH = 200
+const expandedKeys = ref<Set<string>>(new Set())
+
+function isJson(str: string): boolean {
+  try {
+    JSON.parse(str)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function formatValue(value: string, key: string): string {
+  if (isExpanded(key)) return value
+  return value.length > MAX_LENGTH ? value.slice(0, MAX_LENGTH) + '...' : value
+}
+
+function isExpanded(key: string): boolean {
+  return expandedKeys.value.has(key)
+}
+
+function toggleExpand(key: string) {
+  const set = new Set(expandedKeys.value)
+  if (set.has(key)) {
+    set.delete(key)
+  } else {
+    set.add(key)
+  }
+  expandedKeys.value = set
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch (e) {
+    console.error('复制失败', e)
+  }
+}
 
 async function loadDomains() {
   try {
@@ -191,6 +261,36 @@ onUnmounted(() => {
   font-size: 14px;
   color: var(--text-muted);
   margin: 0;
+}
+
+.debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.debug-toggle:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-hover);
+}
+
+.debug-toggle.active {
+  background: rgba(214, 186, 255, 0.15);
+  border-color: rgba(214, 186, 255, 0.30);
+  color: var(--accent-primary);
+}
+
+.debug-toggle .material-icons {
+  font-size: 16px;
 }
 
 .content {
@@ -362,6 +462,70 @@ tbody tr:hover td {
   text-align: center;
   font-style: italic;
   font-size: 13px;
+}
+
+.value-cell {
+  position: relative;
+  padding-right: 32px;
+  max-width: 600px;
+}
+
+.value-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.value-text {
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.show-more {
+  display: inline-flex;
+  align-self: flex-start;
+  font-size: 11px;
+  color: var(--accent-primary);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.show-more:hover {
+  background: rgba(214, 186, 255, 0.10);
+}
+
+.copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.copy-btn .material-icons {
+  font-size: 14px;
+}
+
+.copy-btn:hover {
+  background: rgba(214, 186, 255, 0.20);
+  color: var(--accent-primary);
+}
+
+.value-cell:hover .copy-btn {
+  display: inline-flex;
 }
 
 /* 响应式 */

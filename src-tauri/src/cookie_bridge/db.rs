@@ -3,6 +3,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use super::is_debug_mode;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PushCookie {
@@ -29,14 +31,20 @@ where
     D: Deserializer<'de>,
 {
     let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
-    log::info!("[CookieBridge DB] deserialize_local_storage 收到: {:?}", value.as_ref().map(|v| v.to_string().len()));
+    if is_debug_mode() {
+        log::info!("[CookieBridge DB] deserialize_local_storage 收到: {:?}", value.as_ref().map(|v| v.to_string().len()));
+    }
     match value {
         None => {
-            log::info!("[CookieBridge DB] deserialize_local_storage: None");
+            if is_debug_mode() {
+                log::info!("[CookieBridge DB] deserialize_local_storage: None");
+            }
             Ok(None)
         }
         Some(serde_json::Value::Array(arr)) => {
-            log::info!("[CookieBridge DB] deserialize_local_storage: 数组格式, len={}", arr.len());
+            if is_debug_mode() {
+                log::info!("[CookieBridge DB] deserialize_local_storage: 数组格式, len={}", arr.len());
+            }
             let items: Vec<PushLocalStorage> = arr
                 .into_iter()
                 .map(|v| serde_json::from_value(v).map_err(serde::de::Error::custom))
@@ -44,7 +52,9 @@ where
             Ok(Some(items))
         }
         Some(serde_json::Value::Object(map)) => {
-            log::info!("[CookieBridge DB] deserialize_local_storage: 对象格式, keys={}", map.len());
+            if is_debug_mode() {
+                log::info!("[CookieBridge DB] deserialize_local_storage: 对象格式, keys={}", map.len());
+            }
             let items: Vec<PushLocalStorage> = map
                 .into_iter()
                 .map(|(k, v)| {
@@ -163,14 +173,18 @@ impl Db {
 
         let cookie_count = if let Some(cookies) = &payload.cookies {
             let deleted = tx.execute("DELETE FROM cookies WHERE domain=?1", [&payload.domain])?;
-            log::info!("[CookieBridge DB] 删除旧 cookies: domain={}, 删除条数={}", payload.domain, deleted);
+            if is_debug_mode() {
+                log::info!("[CookieBridge DB] 删除旧 cookies: domain={}, 删除条数={}", payload.domain, deleted);
+            }
             let mut count = 0;
             for c in cookies {
                 let expires_i64 = c.expires.unwrap_or(0.0) as i64;
-                log::info!(
-                    "[CookieBridge DB] 写入 cookie: domain={}, name={}, path={}, expires={:?}, secure={}, http_only={}",
-                    c.domain, c.name, c.path, c.expires, c.secure as i32, c.http_only as i32
-                );
+                if is_debug_mode() {
+                    log::info!(
+                        "[CookieBridge DB] 写入 cookie: domain={}, name={}, path={}, expires={:?}, secure={}, http_only={}",
+                        c.domain, c.name, c.path, c.expires, c.secure as i32, c.http_only as i32
+                    );
+                }
                 tx.execute(
                     "INSERT INTO cookies (domain, name, path, value, expires, secure, http_only, updated_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
@@ -194,13 +208,17 @@ impl Db {
 
         let ls_count = if let Some(ls) = &payload.local_storage {
             let deleted = tx.execute("DELETE FROM local_storage WHERE domain=?1", [&payload.domain])?;
-            log::info!("[CookieBridge DB] 删除旧 local_storage: domain={}, 删除条数={}", payload.domain, deleted);
+            if is_debug_mode() {
+                log::info!("[CookieBridge DB] 删除旧 local_storage: domain={}, 删除条数={}", payload.domain, deleted);
+            }
             let mut count = 0;
             for item in ls {
-                log::info!(
-                    "[CookieBridge DB] 写入 local_storage: domain={}, key={}",
-                    payload.domain, item.key
-                );
+                if is_debug_mode() {
+                    log::info!(
+                        "[CookieBridge DB] 写入 local_storage: domain={}, key={}, value_len={}",
+                        payload.domain, item.key, item.value.len()
+                    );
+                }
                 tx.execute(
                     "INSERT INTO local_storage (domain, key, value, updated_at)
                      VALUES (?1, ?2, ?3, ?4)

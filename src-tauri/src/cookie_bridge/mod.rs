@@ -5,7 +5,19 @@ pub mod http;
 use log::LevelFilter;
 use simplelog::{CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
 use std::fs::OpenOptions;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
+
+static DEBUG_MODE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_debug_mode(enabled: bool) {
+    DEBUG_MODE.store(enabled, Ordering::Relaxed);
+    log::info!("[CookieBridge] debug 模式切换: {}", enabled);
+}
+
+pub fn is_debug_mode() -> bool {
+    DEBUG_MODE.load(Ordering::Relaxed)
+}
 
 use db::Db;
 

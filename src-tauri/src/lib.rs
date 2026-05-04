@@ -49,7 +49,9 @@ pub fn run() {
             desktop::store::save_json_history,
             // cookie_bridge commands
             cookie_bridge::commands::cookie_bridge_list_domains,
-            cookie_bridge::commands::cookie_bridge_get_domain
+            cookie_bridge::commands::cookie_bridge_get_domain,
+            cookie_bridge::commands::cookie_bridge_set_debug_mode,
+            cookie_bridge::commands::cookie_bridge_get_debug_mode,
         ])
         .on_window_event(|window, event| {
             desktop::tray::handle_window_event(window, event);
