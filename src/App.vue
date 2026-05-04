@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -23,13 +23,23 @@ const currentNavName = computed(() => {
 })
 
 const isActive = (path: string) => route.path === path
+
+const sidebarCollapsed = ref(false)
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 </script>
 
 <template>
   <div id="app">
     <!-- SideNavBar -->
-    <aside class="sidebar">
-      <div class="sidebar-brand">开发工具箱</div>
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+      <div class="sidebar-header">
+        <div v-if="!sidebarCollapsed" class="sidebar-brand">开发工具箱</div>
+        <button class="sidebar-toggle" @click="toggleSidebar" title="收起/展开">
+          <span class="material-icons">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+        </button>
+      </div>
       <nav class="sidebar-nav">
         <router-link
           v-for="item in navItems"
@@ -38,10 +48,11 @@ const isActive = (path: string) => route.path === path
           :class="['nav-item', { active: isActive(item.path) }]"
         >
           <span class="nav-icon material-icons">{{ item.icon }}</span>
-          <span class="nav-text">{{ item.name }}</span>
+          <span v-if="!sidebarCollapsed" class="nav-text">{{ item.name }}</span>
         </router-link>
       </nav>
     </aside>
+    <!-- Main Content -->
 
     <!-- Main Content -->
     <main class="main-content">
@@ -133,15 +144,58 @@ body {
   flex-direction: column;
   padding: 20px 14px;
   z-index: 50;
+  transition: width 0.25s ease;
+}
+
+.sidebar.collapsed {
+  width: 64px;
+  padding: 20px 8px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding: 0 2px;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0;
 }
 
 .sidebar-brand {
   font-size: 18px;
   font-weight: 800;
   color: var(--text-primary);
-  margin-bottom: 28px;
-  padding: 0 10px;
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+}
+
+.sidebar-toggle .material-icons {
+  font-size: 18px;
 }
 
 .sidebar-nav {
@@ -163,6 +217,11 @@ body {
   letter-spacing: 0.01em;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 10px;
 }
 
 .nav-item:hover {
@@ -191,6 +250,7 @@ body {
 
 .nav-text {
   font-size: 13px;
+  white-space: nowrap;
 }
 
 /* ========== 主内容区 ========== */
@@ -202,6 +262,11 @@ body {
   height: 100vh;
   overflow: hidden;
   position: relative;
+  transition: margin-left 0.25s ease;
+}
+
+.sidebar.collapsed ~ .main-content {
+  margin-left: 64px;
 }
 
 /* ========== 顶部栏 ========== */
@@ -353,7 +418,8 @@ body {
 
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
-  .sidebar {
+  .sidebar,
+  .sidebar.collapsed {
     width: 60px;
     padding: 16px 8px;
   }
@@ -371,7 +437,8 @@ body {
     padding: 10px;
   }
 
-  .main-content {
+  .main-content,
+  .sidebar.collapsed ~ .main-content {
     margin-left: 60px;
   }
 

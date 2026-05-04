@@ -33,3 +33,15 @@ pub async fn cookie_bridge_set_debug_mode(enabled: bool) {
 pub async fn cookie_bridge_get_debug_mode() -> bool {
     is_debug_mode()
 }
+
+#[tauri::command]
+pub async fn cookie_bridge_delete_domain(
+    domain: String,
+    state: State<'_, Db>,
+) -> Result<(usize, usize), String> {
+    let db = state.inner().clone();
+    tokio::task::spawn_blocking(move || db.delete_domain(&domain))
+        .await
+        .map_err(|e| format!("task error: {}", e))?
+        .map_err(|e| format!("db error: {}", e))
+}

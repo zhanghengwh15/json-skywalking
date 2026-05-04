@@ -5,15 +5,26 @@
         <h1>Cookie Bridge</h1>
         <p>查看 Chrome 扩展推送的 Cookie 和 LocalStorage 数据</p>
       </div>
-      <button
-        class="debug-toggle"
-        :class="{ active: debugMode }"
-        @click="toggleDebug"
-        title="切换 Debug 日志模式"
-      >
-        <span class="material-icons">bug_report</span>
-        {{ debugMode ? 'Debug ON' : 'Debug' }}
-      </button>
+      <div class="header-actions">
+        <button
+          v-if="selectedDomain"
+          class="debug-toggle"
+          @click="copyBaseInfo"
+          title="复制基础信息"
+        >
+          <span class="material-icons">content_copy</span>
+          基础信息
+        </button>
+        <button
+          class="debug-toggle"
+          :class="{ active: debugMode }"
+          @click="toggleDebug"
+          title="切换 Debug 日志模式"
+        >
+          <span class="material-icons">bug_report</span>
+          {{ debugMode ? 'Debug ON' : 'Debug' }}
+        </button>
+      </div>
     </div>
     <div class="content">
       <div class="domain-sidebar">
@@ -29,7 +40,14 @@
               @click="selectDomain(d)"
             >
               <span class="domain-dot"></span>
-              {{ d }}
+              <span class="domain-name">{{ d }}</span>
+              <button
+                class="domain-delete"
+                title="删除"
+                @click.stop="deleteDomain(d)"
+              >
+                <span class="material-icons">delete</span>
+              </button>
             </li>
           </ul>
           <div v-else class="empty">
@@ -84,13 +102,13 @@
                   <td class="mono">{{ ls.key }}</td>
                   <td class="mono value-cell">
                     <div class="value-wrap">
-                      <span class="value-text">{{ formatValue(ls.value, ls.key) }}</span>
-                      <span v-if="ls.value.length > MAX_LENGTH" class="show-more" @click.stop="toggleExpand(ls.key)">
+                      <pre v-if="isJson(ls.value) && isExpanded(ls.key)" class="json-block">{{ formatJson(ls.value) }}</pre>
+                      <span v-else class="value-text">{{ formatValue(ls.value, ls.key) }}</span>
+                      <span v-if="ls.value.length > MAX_LENGTH || (isJson(ls.value) && formatJson(ls.value).length > MAX_LENGTH)" class="show-more" @click.stop="toggleExpand(ls.key)">
                         {{ isExpanded(ls.key) ? 'show less' : 'show more' }}
                       </span>
                     </div>
                     <button
-                      v-if="isJson(ls.value)"
                       class="copy-btn"
                       title="复制"
                       @click.stop="copyText(ls.value)"
@@ -109,6 +127,12 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 复制成功提示 -->
+  <div class="copy-tip" :class="{ visible: copyTipVisible }">
+    <span class="material-icons">check_circle</span>
+    已复制
   </div>
 </template>
 
@@ -164,9 +188,19 @@ function isJson(str: string): boolean {
   }
 }
 
+function formatJson(str: string): string {
+  try {
+    const obj = JSON.parse(str)
+    return JSON.stringify(obj, null, 2)
+  } catch {
+    return str
+  }
+}
+
 function formatValue(value: string, key: string): string {
-  if (isExpanded(key)) return value
-  return value.length > MAX_LENGTH ? value.slice(0, MAX_LENGTH) + '...' : value
+  if (isExpanded(key)) return isJson(value) ? formatJson(value) : value
+  const display = isJson(value) ? formatJson(value) : value
+  return display.length > MAX_LENGTH ? display.slice(0, MAX_LENGTH) + '...' : display
 }
 
 function isExpanded(key: string): boolean {
@@ -183,12 +217,72 @@ function toggleExpand(key: string) {
   expandedKeys.value = set
 }
 
+const copyTipVisible = ref(false)
+let copyTipTimer: ReturnType<typeof setTimeout> | null = null
+
+function showCopyTip() {
+  copyTipVisible.value = true
+  if (copyTipTimer) clearTimeout(copyTipTimer)
+  copyTipTimer = setTimeout(() => {
+    copyTipVisible.value = false
+  }, 1500)
+}
+
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text)
+    showCopyTip()
   } catch (e) {
     console.error('复制失败', e)
   }
+}
+
+function getLsValue(key: string): string | null {
+  const item = currentDomain.value.localStorage.find((ls: LocalStorageItem) => ls.key === key)
+  return item ? item.value : null
+}
+
+function getLsJsonValue(key: string, path?: string): string | null {
+  const raw = getLsValue(key)
+  if (!raw) return null
+  if (!path) return raw
+  try {
+    const obj = JSON.parse(raw)
+    const parts = path.split('.')
+    let val: unknown = obj
+    for (const p of parts) {
+      if (val && typeof val === 'object' && p in val) {
+        val = (val as Record<string, unknown>)[p]
+      } else {
+        return null
+      }
+    }
+    return String(val ?? '')
+  } catch {
+    return null
+  }
+}
+
+async function copyBaseInfo() {
+  const baseInfo: Record<string, string> = {}
+
+  const openOrgId = getLsValue('openOrgId')
+  if (openOrgId) baseInfo.eid = openOrgId
+
+  const operateUserId = getLsValue('operateUserId')
+  if (operateUserId) baseInfo.operateUserId = operateUserId
+
+  const orgId = getLsValue('orgId') ?? getLsJsonValue('orgdata', 'orgId')
+  if (orgId) baseInfo.orgId = orgId
+
+  const uid = getLsValue('uid')
+  if (uid) baseInfo.uid = uid
+
+  const token = getLsValue('accessToken')
+  if (token) baseInfo.token = token
+
+  const json = JSON.stringify(baseInfo, null, 2)
+  await copyText(json)
 }
 
 async function loadDomains() {
@@ -214,6 +308,20 @@ async function loadDetail(domain: string) {
 async function selectDomain(domain: string) {
   selectedDomain.value = domain
   await loadDetail(domain)
+}
+
+async function deleteDomain(domain: string) {
+  if (!confirm(`确定删除域名 "${domain}" 的所有数据？`)) return
+  try {
+    await invoke('cookie_bridge_delete_domain', { domain })
+    await loadDomains()
+    if (selectedDomain.value === domain) {
+      selectedDomain.value = ''
+      currentDomain.value = { cookies: [], localStorage: [] }
+    }
+  } catch (e) {
+    console.error('删除域名失败', e)
+  }
 }
 
 onMounted(async () => {
@@ -261,6 +369,13 @@ onUnmounted(() => {
   font-size: 14px;
   color: var(--text-muted);
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .debug-toggle {
@@ -365,6 +480,7 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--text-secondary);
   transition: all 0.15s ease;
+  position: relative;
 }
 
 .domain-list li:hover {
@@ -388,6 +504,42 @@ onUnmounted(() => {
 
 .domain-list li.active .domain-dot {
   background: var(--accent-primary);
+}
+
+.domain-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.domain-delete {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.domain-delete .material-icons {
+  font-size: 14px;
+}
+
+.domain-delete:hover {
+  background: rgba(255, 100, 100, 0.15);
+  color: #ff6464;
+}
+
+.domain-list li:hover .domain-delete {
+  display: inline-flex;
 }
 
 .empty {
@@ -526,6 +678,54 @@ tbody tr:hover td {
 
 .value-cell:hover .copy-btn {
   display: inline-flex;
+}
+
+.json-block {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.20);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  font-family: 'SF Mono', 'Monaco', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.copy-tip {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.copy-tip.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.copy-tip .material-icons {
+  font-size: 16px;
+  color: #4ade80;
 }
 
 /* 响应式 */

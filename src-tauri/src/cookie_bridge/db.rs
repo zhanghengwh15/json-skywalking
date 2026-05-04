@@ -5,6 +5,20 @@ use std::sync::{Arc, Mutex};
 
 use super::is_debug_mode;
 
+fn deserialize_bool_or_int<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Bool(b) => Ok(b),
+        serde_json::Value::Number(n) => {
+            Ok(n.as_i64().map_or(false, |v| v != 0))
+        }
+        _ => Err(serde::de::Error::custom("expected bool or int (0/1)")),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PushCookie {
@@ -15,7 +29,13 @@ pub struct PushCookie {
     pub path: String,
     #[serde(alias = "expirationDate", default)]
     pub expires: Option<f64>,
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
     pub secure: bool,
+    #[serde(
+        alias = "http_only",
+        rename = "httpOnly",
+        deserialize_with = "deserialize_bool_or_int"
+    )]
     pub http_only: bool,
 }
 
@@ -306,5 +326,21 @@ impl Db {
             cookies,
             local_storage,
         })
+    }
+
+    pub fn delete_domain(&self, domain: &str) -> Result<(usize, usize)> {
+        log::info!("[CookieBridge DB] 删除域名: domain={}", domain);
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+
+        let cookies_deleted = tx.execute("DELETE FROM cookies WHERE domain = ?1", [domain])?;
+        let ls_deleted = tx.execute("DELETE FROM local_storage WHERE domain = ?1", [domain])?;
+
+        tx.commit()?;
+        log::info!(
+            "[CookieBridge DB] 删除完成: domain={}, cookies={}, local_storage={}",
+            domain, cookies_deleted, ls_deleted
+        );
+        Ok((cookies_deleted, ls_deleted))
     }
 }
