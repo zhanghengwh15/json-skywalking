@@ -77,7 +77,7 @@ Content-Type: application/json
 | `domain` | string | 是 | 数据所属的域名 |
 | `cookies` | array / null | 否 | cookie 列表，`null` 表示不修改该域的 cookies |
 | `local_storage` | array / null | 否 | localStorage 条目列表，`null` 表示不修改 |
-| `ts` | number | 是 | 推送时间戳（毫秒），用于排序和去重 |
+| `ts` | number | 否 | 推送时间戳（毫秒），用于排序和去重；缺省时由服务端用当前时间填充 |
 
 **Cookie 条目字段**：
 

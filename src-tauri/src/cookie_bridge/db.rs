@@ -2,6 +2,7 @@ use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::is_debug_mode;
 
@@ -106,7 +107,15 @@ pub struct PushPayload {
     pub cookies: Option<Vec<PushCookie>>,
     #[serde(default, deserialize_with = "deserialize_local_storage", alias = "local_storage")]
     pub local_storage: Option<Vec<PushLocalStorage>>,
-    pub ts: i64,
+    #[serde(default)]
+    pub ts: Option<i64>,
+}
+
+fn current_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Serialize)]
@@ -180,12 +189,14 @@ impl Db {
     }
 
     pub fn push(&self, payload: &PushPayload) -> Result<(usize, usize)> {
+        let effective_ts = payload.ts.unwrap_or_else(current_millis);
         log::info!(
-            "[CookieBridge DB] push 开始: domain={}, cookies={}, local_storage={}, ts={}",
+            "[CookieBridge DB] push 开始: domain={}, cookies={}, local_storage={}, ts={}{}",
             payload.domain,
             payload.cookies.as_ref().map_or(0, |v| v.len()),
             payload.local_storage.as_ref().map_or(0, |v| v.len()),
-            payload.ts
+            effective_ts,
+            if payload.ts.is_none() { " (服务端补默认值)" } else { "" }
         );
 
         let mut conn = self.conn.lock().unwrap();
@@ -216,7 +227,7 @@ impl Db {
                         updated_at=excluded.updated_at",
                     params![
                         c.domain, c.name, c.path, c.value, expires_i64, c.secure, c.http_only,
-                        payload.ts
+                        effective_ts
                     ],
                 )?;
                 count += 1;
@@ -245,7 +256,7 @@ impl Db {
                      ON CONFLICT(domain, key) DO UPDATE SET
                         value=excluded.value,
                         updated_at=excluded.updated_at",
-                    params![payload.domain, item.key, item.value, payload.ts],
+                    params![payload.domain, item.key, item.value, effective_ts],
                 )?;
                 count += 1;
             }
