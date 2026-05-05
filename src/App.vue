@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { path: '/sql-parser', name: 'SQL解析', icon: 'storage' },
   { path: '/http-parser', name: 'HTTP解析', icon: 'http' },
   { path: '/cookie-bridge', name: 'Cookie信息', icon: 'cookie' },
+  { path: '/task-branch-group', name: '任务分支', icon: 'account_tree' },
 ]
 
 const currentNavName = computed(() => {

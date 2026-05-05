@@ -34,11 +34,14 @@ pub struct ErrorResponse {
 }
 
 pub fn create_router(state: AppState) -> Router {
+    let tbg_router = crate::task_branch_group::http::create_router();
+
     Router::new()
         .route("/health", get(health_handler))
         .route("/push", post(push_handler))
         .route("/domains", get(list_domains_handler))
         .route("/domains/:domain", get(get_domain_handler))
+        .nest("/api/task-branch-groups", tbg_router)
         .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024)) // 10MB
         .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state)

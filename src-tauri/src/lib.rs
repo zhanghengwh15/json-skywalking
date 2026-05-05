@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "console")]
 
 // 引入模块
-mod cookie_bridge;
-mod desktop;
+pub mod cookie_bridge;
+pub mod desktop;
+pub mod task_branch_group;
 
 // 重新导出需要的类型
 pub use desktop::store::{ParseRecord, SqlHistoryItem, JsonHistoryItem};
@@ -53,6 +54,12 @@ pub fn run() {
             cookie_bridge::commands::cookie_bridge_set_debug_mode,
             cookie_bridge::commands::cookie_bridge_get_debug_mode,
             cookie_bridge::commands::cookie_bridge_delete_domain,
+            // task_branch_group commands
+            task_branch_group::commands::task_branch_group_create,
+            task_branch_group::commands::task_branch_group_list,
+            task_branch_group::commands::task_branch_group_get,
+            task_branch_group::commands::task_branch_group_update,
+            task_branch_group::commands::task_branch_group_delete,
         ])
         .on_window_event(|window, event| {
             desktop::tray::handle_window_event(window, event);

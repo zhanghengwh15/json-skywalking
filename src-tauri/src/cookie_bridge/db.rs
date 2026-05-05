@@ -153,6 +153,10 @@ pub struct Db {
 }
 
 impl Db {
+    pub(crate) fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap()
+    }
+
     pub fn open(path: &Path) -> Result<Self> {
         log::info!("[CookieBridge DB] 打开数据库: {:?}", path);
         let conn = Connection::open(path)?;
@@ -180,6 +184,23 @@ impl Db {
                 updated_at INTEGER NOT NULL,
                 PRIMARY KEY (domain, key)
             );
+            CREATE TABLE IF NOT EXISTS task_branch_group (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tb_name TEXT NOT NULL DEFAULT '',
+                task_id TEXT NOT NULL DEFAULT '',
+                branch_name TEXT NOT NULL DEFAULT '',
+                group_type INTEGER NOT NULL DEFAULT 1,
+                create_time DATETIME NOT NULL DEFAULT (datetime('now')),
+                modify_time DATETIME NOT NULL DEFAULT (datetime('now')),
+                rec_status INTEGER NOT NULL DEFAULT 1,
+                create_by INTEGER NOT NULL DEFAULT 0,
+                modify_by INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TRIGGER IF NOT EXISTS trg_task_branch_group_modify_time
+            AFTER UPDATE ON task_branch_group
+            BEGIN
+                UPDATE task_branch_group SET modify_time = datetime('now') WHERE id = NEW.id;
+            END;
         "#;
         conn.execute_batch(schema)?;
 

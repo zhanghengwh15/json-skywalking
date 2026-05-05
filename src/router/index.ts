@@ -22,6 +22,11 @@ const routes = [
     component: () => import('../views/CookieBridge.vue')
   },
   {
+    path: '/task-branch-group',
+    name: 'TaskBranchGroup',
+    component: () => import('../views/TaskBranchGroup.vue')
+  },
+  {
     path: '/:catchAll(.*)',
     redirect: '/json-parser'
   }

@@ -36,6 +36,7 @@ tower-http = { version = "0.5", features = ["cors", "limit"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 log = "0.4"
 simplelog = "0.12"
+clap = { version = "4.5", features = ["derive"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
