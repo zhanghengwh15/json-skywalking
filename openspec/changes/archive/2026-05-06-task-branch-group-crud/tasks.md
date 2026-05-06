@@ -22,4 +22,4 @@
 - [x] 3.2 Run frontend dev server and verify page renders correctly
 - [x] 3.3 Test CLI commands: `list`, `create`, `update`, `delete`, `get`
 - [x] 3.4 Test HTTP API endpoints via curl
-- [ ] 3.5 Test Tauri invoke commands via frontend UI
+- [x] 3.5 Test Tauri invoke commands via frontend UI
