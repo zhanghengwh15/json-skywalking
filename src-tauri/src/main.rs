@@ -20,6 +20,12 @@ enum Commands {
         #[command(subcommand)]
         action: TaskBranchGroupAction,
     },
+    /// 域名管理
+    #[command(name = "domain")]
+    Domain {
+        #[command(subcommand)]
+        action: DomainAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -67,6 +73,44 @@ enum TaskBranchGroupAction {
     /// 软删除
     Delete {
         id: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum DomainAction {
+    /// 列表查询
+    List,
+    /// 创建域
+    Create {
+        #[arg(long)]
+        domain_name: String,
+        #[arg(long)]
+        urls: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// 查询单条
+    Get {
+        id: i64,
+    },
+    /// 更新域
+    Update {
+        id: i64,
+        #[arg(long)]
+        domain_name: Option<String>,
+        #[arg(long)]
+        urls: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// 删除域（级联删除 cookies / local_storage）
+    Delete {
+        id: i64,
+    },
+    /// 按 URL 匹配域
+    Match {
+        #[arg(long)]
+        url: String,
     },
 }
 
@@ -169,11 +213,112 @@ fn run_cli(action: TaskBranchGroupAction) {
     }
 }
 
+fn run_domain_cli(action: DomainAction) {
+    let app_data_dir = default_app_data_dir();
+    std::fs::create_dir_all(&app_data_dir).expect("create app data dir failed");
+    let db_path = app_data_dir.join("data.db");
+
+    let db = tauri_app_lib::cookie_bridge::db::Db::open(&db_path).expect("open db failed");
+
+    match action {
+        DomainAction::List => {
+            let items = db.domain_list().expect("list failed");
+            println!("{}", serde_json::to_string_pretty(&items).unwrap());
+        }
+        DomainAction::Create {
+            domain_name,
+            urls,
+            description,
+        } => {
+            let item = tauri_app_lib::cookie_bridge::db::CreateDomain {
+                domain_name,
+                urls,
+                description,
+            };
+            let id = db.domain_create(&item).expect("create failed");
+            let created = db.domain_get(id).expect("get failed");
+            println!("{}", serde_json::to_string_pretty(&created).unwrap());
+        }
+        DomainAction::Get { id } => {
+            let item = db.domain_get(id).expect("get failed");
+            if let Some(domain) = item {
+                println!("{}", serde_json::to_string_pretty(&domain).unwrap());
+            } else {
+                eprintln!("not found");
+                std::process::exit(1);
+            }
+        }
+        DomainAction::Update {
+            id,
+            domain_name,
+            urls,
+            description,
+        } => {
+            let item = tauri_app_lib::cookie_bridge::db::UpdateDomain {
+                domain_name,
+                urls,
+                description,
+            };
+            let updated = db.domain_update(id, &item).expect("update failed");
+            if updated {
+                let result = db.domain_get(id).expect("get failed");
+                if let Some(domain) = result {
+                    println!("{}", serde_json::to_string_pretty(&domain).unwrap());
+                } else {
+                    eprintln!("updated item not found");
+                    std::process::exit(1);
+                }
+            } else {
+                eprintln!("not found or no changes");
+                std::process::exit(1);
+            }
+        }
+        DomainAction::Delete { id } => {
+            let deleted = db.domain_delete(id).expect("delete failed");
+            if deleted {
+                println!("{{\"deleted\":true}}");
+            } else {
+                eprintln!("not found");
+                std::process::exit(1);
+            }
+        }
+        DomainAction::Match { url } => {
+            let result = db.domain_match_url(&url).expect("match failed");
+            if let Some((domain, cookies, local_storage)) = result {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "domain": domain,
+                        "cookies": cookies,
+                        "localStorage": local_storage,
+                    }))
+                    .unwrap()
+                );
+            } else {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "domain": serde_json::Value::Null,
+                        "cookies": [],
+                        "localStorage": [],
+                    }))
+                    .unwrap()
+                );
+            }
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
     if let Some(Commands::TaskBranchGroup { action }) = cli.command {
         run_cli(action);
+        return;
+    }
+
+    if let Some(Commands::Domain { action }) = cli.command {
+        run_domain_cli(action);
         return;
     }
 

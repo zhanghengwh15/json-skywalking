@@ -54,6 +54,13 @@ pub fn run() {
             cookie_bridge::commands::cookie_bridge_set_debug_mode,
             cookie_bridge::commands::cookie_bridge_get_debug_mode,
             cookie_bridge::commands::cookie_bridge_delete_domain,
+            // domain management commands
+            cookie_bridge::commands::domain_list,
+            cookie_bridge::commands::domain_create,
+            cookie_bridge::commands::domain_get,
+            cookie_bridge::commands::domain_update,
+            cookie_bridge::commands::domain_delete,
+            cookie_bridge::commands::domain_match_url,
             // task_branch_group commands
             task_branch_group::commands::task_branch_group_create,
             task_branch_group::commands::task_branch_group_list,

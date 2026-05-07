@@ -35,12 +35,12 @@
           <ul v-if="domains.length > 0">
             <li
               v-for="d in domains"
-              :key="d"
-              :class="{ active: d === selectedDomain }"
+              :key="d.id"
+              :class="{ active: d.domainName === selectedDomain }"
               @click="selectDomain(d)"
             >
               <span class="domain-dot"></span>
-              <span class="domain-name">{{ d }}</span>
+              <span class="domain-name">{{ d.domainName }}</span>
               <button
                 class="domain-delete"
                 title="删除"
@@ -148,8 +148,17 @@ async function toggleDebug() {
   await invoke('cookie_bridge_set_debug_mode', { enabled: debugMode.value })
 }
 
+interface Domain {
+  id: number
+  domainName: string
+  urls: string | null
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 interface CookieItem {
-  domain: string
+  domainName: string
   name: string
   path: string
   value: string
@@ -160,20 +169,21 @@ interface CookieItem {
 }
 
 interface LocalStorageItem {
-  domain: string
+  domainName: string
   key: string
   value: string
   updatedAt: number
 }
 
 interface DomainSnapshot {
+  domain: Domain | null
   cookies: CookieItem[]
   localStorage: LocalStorageItem[]
 }
 
-const domains = ref<string[]>([])
+const domains = ref<Domain[]>([])
 const selectedDomain = ref<string>('')
-const currentDomain = ref<DomainSnapshot>({ cookies: [], localStorage: [] })
+const currentDomain = ref<DomainSnapshot>({ domain: null, cookies: [], localStorage: [] })
 let unlisten: UnlistenFn | null = null
 
 const MAX_LENGTH = 200
@@ -287,9 +297,9 @@ async function copyBaseInfo() {
 
 async function loadDomains() {
   try {
-    domains.value = await invoke<string[]>('cookie_bridge_list_domains')
+    domains.value = await invoke<Domain[]>('cookie_bridge_list_domains')
     if (domains.value.length > 0 && !selectedDomain.value) {
-      selectedDomain.value = domains.value[0]
+      selectedDomain.value = domains.value[0].domainName
       await loadDetail(selectedDomain.value)
     }
   } catch (e) {
@@ -305,19 +315,19 @@ async function loadDetail(domain: string) {
   }
 }
 
-async function selectDomain(domain: string) {
-  selectedDomain.value = domain
-  await loadDetail(domain)
+async function selectDomain(domain: Domain) {
+  selectedDomain.value = domain.domainName
+  await loadDetail(domain.domainName)
 }
 
-async function deleteDomain(domain: string) {
-  if (!confirm(`确定删除域名 "${domain}" 的所有数据？`)) return
+async function deleteDomain(domain: Domain) {
+  if (!confirm(`确定删除域名 "${domain.domainName}" 的所有数据？`)) return
   try {
-    await invoke('cookie_bridge_delete_domain', { domain })
+    await invoke('cookie_bridge_delete_domain', { domain: domain.domainName })
     await loadDomains()
-    if (selectedDomain.value === domain) {
+    if (selectedDomain.value === domain.domainName) {
       selectedDomain.value = ''
-      currentDomain.value = { cookies: [], localStorage: [] }
+      currentDomain.value = { domain: null, cookies: [], localStorage: [] }
     }
   } catch (e) {
     console.error('删除域名失败', e)
