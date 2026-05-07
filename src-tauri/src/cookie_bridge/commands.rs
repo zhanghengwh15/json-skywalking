@@ -63,7 +63,8 @@ pub async fn domain_create(
     state: State<'_, Db>,
 ) -> Result<Domain, String> {
     let db = state.inner().clone();
-    let id = tokio::task::spawn_blocking(move || db.domain_create(&payload))
+    let db_for_create = db.clone();
+    let id = tokio::task::spawn_blocking(move || db_for_create.domain_create(&payload))
         .await
         .map_err(|e| format!("task error: {}", e))?
         .map_err(|e| format!("db error: {}", e))?;
@@ -90,7 +91,8 @@ pub async fn domain_update(
     state: State<'_, Db>,
 ) -> Result<Domain, String> {
     let db = state.inner().clone();
-    let updated = tokio::task::spawn_blocking(move || db.domain_update(id, &payload))
+    let db_for_update = db.clone();
+    let updated = tokio::task::spawn_blocking(move || db_for_update.domain_update(id, &payload))
         .await
         .map_err(|e| format!("task error: {}", e))?
         .map_err(|e| format!("db error: {}", e))?;
