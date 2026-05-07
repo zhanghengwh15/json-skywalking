@@ -16,26 +16,26 @@ The system SHALL allow creating a task-branch-group association record with tb_n
 - **THEN** the system inserts a new record and prints the created record as JSON
 
 ### Requirement: Read task branch group records
-The system SHALL support querying task branch group records by id or listing all records with optional task_id filter.
+The system SHALL support querying task branch group records by id or listing records with optional filters: keyword fuzzy match (UI/Tauri) and exact task_id / branch_name (HTTP, CLI).
 
 #### Scenario: List all records
-- **WHEN** the frontend invokes `task_branch_group_list` or GET `/api/task-branch-groups`
+- **WHEN** the frontend invokes `task_branch_group_list` without parameters or GET `/api/task-branch-groups`
 - **THEN** the system returns an array of all records with rec_status = 1
 
-#### Scenario: Filter by task_id
-- **WHEN** the frontend invokes `task_branch_group_list` with task_id parameter or GET `/api/task-branch-groups?task_id=<id>`
-- **THEN** the system returns only records matching the given task_id
+#### Scenario: Fuzzy filter via keyword (UI/Tauri)
+- **WHEN** the frontend invokes `task_branch_group_list` with `keyword` parameter or GET `/api/task-branch-groups?keyword=<kw>`
+- **THEN** the system returns records whose `tb_name` OR `task_id` contains the keyword (LIKE %kw%)
+
+#### Scenario: Exact filter via task_id and/or branch_name (HTTP, CLI)
+- **WHEN** GET `/api/task-branch-groups?task_id=<id>&branch_name=<b>` is called, or `dev-tools.exe task-branch-group list --task-id <id> --branch-name <b>` is run
+- **THEN** the system returns records that exactly match every provided filter (AND-combined)
 
 #### Scenario: Get single record by id
 - **WHEN** the frontend invokes `task_branch_group_get` with id or GET `/api/task-branch-groups/<id>`
 - **THEN** the system returns the matching record or a not-found error
 
-#### Scenario: CLI list with filter
-- **WHEN** user runs `dev-tools.exe task-branch-group list --task-id <id>`
-- **THEN** the system prints matching records as JSON array
-
 ### Requirement: Update task branch group record
-The system SHALL allow updating tb_name, branch_name, group_type, and rec_status of an existing record.
+The system SHALL allow updating tb_name, task_id, branch_name, group_type, and rec_status of an existing record. modify_time is refreshed automatically by trigger.
 
 #### Scenario: Successful update via Tauri command
 - **WHEN** the frontend invokes `task_branch_group_update` with id and updated fields
