@@ -68,24 +68,6 @@
               <span>{{ dateParts.rest }}</span>
             </div>
           </div>
-          <div v-if="formattedDate" class="result-grid">
-            <div class="result-item">
-              <div class="result-label">UTC 时间</div>
-              <div class="result-value">{{ utcDate }}</div>
-            </div>
-            <div class="result-item">
-              <div class="result-label">毫秒时间戳</div>
-              <div class="result-value">{{ msTimestamp }}</div>
-            </div>
-            <div class="result-item">
-              <div class="result-label">秒时间戳</div>
-              <div class="result-value">{{ sTimestamp }}</div>
-            </div>
-            <div class="result-item">
-              <div class="result-label">星期 / 时区</div>
-              <div class="result-value">{{ weekday }} · {{ timezone }}</div>
-            </div>
-          </div>
           <div v-else class="placeholder">
             <span class="material-icons placeholder-icon">access_time</span>
             <p>请输入时间戳并点击转换</p>
