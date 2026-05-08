@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { path: '/http-parser', name: 'HTTP解析', icon: 'http' },
   { path: '/cookie-bridge', name: 'Cookie信息', icon: 'cookie' },
   { path: '/task-branch-group', name: '任务分支', icon: 'account_tree' },
+  { path: '/timestamp-converter', name: '时间戳转换', icon: 'schedule' },
 ]
 
 const currentNavName = computed(() => {
