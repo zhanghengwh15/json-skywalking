@@ -63,14 +63,14 @@ pub async fn domain_create(
     state: State<'_, Db>,
 ) -> Result<Domain, String> {
     let db = state.inner().clone();
-    let id = tokio::task::spawn_blocking(move || db.domain_create(&payload))
-        .await
-        .map_err(|e| format!("task error: {}", e))?
-        .map_err(|e| format!("db error: {}", e))?;
-
-    db.domain_get(id)
-        .map(|opt| opt.ok_or_else(|| "created item not found".to_string()))
-        .map_err(|e| format!("db error: {}", e))?
+    tokio::task::spawn_blocking(move || {
+        let id = db.domain_create(&payload).map_err(|e| format!("db error: {}", e))?;
+        db.domain_get(id)
+            .map(|opt| opt.ok_or_else(|| "created item not found".to_string()))
+            .map_err(|e| format!("db error: {}", e))?
+    })
+    .await
+    .map_err(|e| format!("task error: {}", e))?
 }
 
 #[tauri::command]
@@ -90,18 +90,17 @@ pub async fn domain_update(
     state: State<'_, Db>,
 ) -> Result<Domain, String> {
     let db = state.inner().clone();
-    let updated = tokio::task::spawn_blocking(move || db.domain_update(id, &payload))
-        .await
-        .map_err(|e| format!("task error: {}", e))?
-        .map_err(|e| format!("db error: {}", e))?;
-
-    if !updated {
-        return Err("not found or no changes".to_string());
-    }
-
-    db.domain_get(id)
-        .map(|opt| opt.ok_or_else(|| "updated item not found".to_string()))
-        .map_err(|e| format!("db error: {}", e))?
+    tokio::task::spawn_blocking(move || {
+        let updated = db.domain_update(id, &payload).map_err(|e| format!("db error: {}", e))?;
+        if !updated {
+            return Err("not found or no changes".to_string());
+        }
+        db.domain_get(id)
+            .map(|opt| opt.ok_or_else(|| "updated item not found".to_string()))
+            .map_err(|e| format!("db error: {}", e))?
+    })
+    .await
+    .map_err(|e| format!("task error: {}", e))?
 }
 
 #[tauri::command]
