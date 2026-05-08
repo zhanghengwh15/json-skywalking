@@ -60,7 +60,13 @@
         <div class="panel-body result-body">
           <div v-if="formattedDate" class="result-block">
             <div class="result-label">本地时间 (yyyy-MM-dd HH:mm:ss)</div>
-            <div class="result-value primary">{{ formattedDate }}</div>
+            <div class="result-value primary">
+              <span>{{ dateParts.yearPrefix }}</span>
+              <span class="year-highlight">{{ dateParts.yearSuffix }}</span>
+              <span>{{ dateParts.sep1 }}</span>
+              <span class="month-highlight">{{ dateParts.month }}</span>
+              <span>{{ dateParts.rest }}</span>
+            </div>
           </div>
           <div v-if="formattedDate" class="result-grid">
             <div class="result-item">
@@ -180,6 +186,18 @@ function convert() {
 }
 
 const canAutoConvert = computed(() => timestampInput.value.trim() !== '')
+
+const dateParts = computed(() => {
+  if (!formattedDate.value) return { yearPrefix: '', yearSuffix: '', sep1: '', month: '', rest: '' }
+  const s = formattedDate.value
+  return {
+    yearPrefix: s.slice(0, 2),
+    yearSuffix: s.slice(2, 4),
+    sep1: s.slice(4, 5),
+    month: s.slice(5, 7),
+    rest: s.slice(7),
+  }
+})
 
 watch([timestampInput, unit], () => {
   if (canAutoConvert.value) {
@@ -470,6 +488,16 @@ function showToast(type: 'success' | 'error' | 'info', message: string) {
   font-weight: 600;
   color: var(--accent-primary);
   letter-spacing: 0.02em;
+}
+
+.year-highlight {
+  color: #ff4d4f;
+  font-weight: 700;
+}
+
+.month-highlight {
+  color: #fadb14;
+  font-weight: 700;
 }
 
 .placeholder {
