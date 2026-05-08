@@ -13,7 +13,7 @@ use tauri::Emitter;
 use tokio::net::TcpListener;
 use tokio::task;
 
-use super::db::{Db, PushPayload, CreateDomain, UpdateDomain, Domain, DomainSnapshot};
+use super::db::{Db, PushPayload, CreateDomain, UpdateDomain, Domain};
 
 #[derive(Clone)]
 pub struct AppState {

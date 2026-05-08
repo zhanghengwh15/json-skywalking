@@ -27,6 +27,11 @@ const routes = [
     component: () => import('../views/TaskBranchGroup.vue')
   },
   {
+    path: '/timestamp-converter',
+    name: 'TimestampConverter',
+    component: () => import('../views/TimestampConverter.vue')
+  },
+  {
     path: '/:catchAll(.*)',
     redirect: '/json-parser'
   }
