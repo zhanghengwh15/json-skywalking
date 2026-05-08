@@ -81,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+// @ts-ignore
 import { computed, ref, watch } from 'vue'
 
 type Unit = 'ms' | 's'
@@ -88,11 +89,6 @@ type Unit = 'ms' | 's'
 const timestampInput = ref('')
 const unit = ref<Unit>('ms')
 const formattedDate = ref('')
-const utcDate = ref('')
-const msTimestamp = ref('')
-const sTimestamp = ref('')
-const weekday = ref('')
-const timezone = ref('')
 const errorMessage = ref('')
 const toast = ref<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
 
@@ -104,29 +100,8 @@ function formatLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-function formatUtc(date: Date): string {
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
-}
-
-function getWeekday(date: Date): string {
-  const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
-  return days[date.getDay()]
-}
-
-function getTimezone(): string {
-  const offset = -new Date().getTimezoneOffset()
-  const sign = offset >= 0 ? '+' : '-'
-  const abs = Math.abs(offset)
-  return `UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
-}
-
 function reset() {
   formattedDate.value = ''
-  utcDate.value = ''
-  msTimestamp.value = ''
-  sTimestamp.value = ''
-  weekday.value = ''
-  timezone.value = ''
 }
 
 function convert() {
@@ -160,11 +135,6 @@ function convert() {
   }
 
   formattedDate.value = formatLocal(date)
-  utcDate.value = formatUtc(date)
-  msTimestamp.value = String(Math.trunc(ms))
-  sTimestamp.value = String(Math.trunc(ms / 1000))
-  weekday.value = getWeekday(date)
-  timezone.value = getTimezone()
 }
 
 const canAutoConvert = computed(() => timestampInput.value.trim() !== '')
