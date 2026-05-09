@@ -719,6 +719,15 @@
   border-bottom: 1px solid var(--border-default);
 }
 
+.context-menu-item.danger {
+  color: #e57373;
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(229, 115, 115, 0.12);
+  color: #ff6b6b;
+}
+
 .menu-icon {
   font-size: 14px;
   width: 16px;

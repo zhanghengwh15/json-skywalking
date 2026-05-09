@@ -164,6 +164,11 @@
         <span>编辑 Value</span>
         <span class="menu-preview">{{ getValuePreview(contextMenuData?.value) }}</span>
       </div>
+      <div class="context-menu-item danger" @click="deleteKey">
+        <span class="menu-icon">🗑️</span>
+        <span>删除 Key</span>
+        <span class="menu-key">{{ contextMenuData?.key }}</span>
+      </div>
     </div>
     
     <!-- 右键菜单遮罩 -->
@@ -1128,6 +1133,84 @@ function editValue() {
   }
   
   showEditDialog.value = true
+}
+
+// 删除 key（数组用 splice，对象用 delete）
+function deleteKey() {
+  if (!contextMenuData.value || !parsedJson.value) {
+    closeContextMenu()
+    return
+  }
+
+  const path = contextMenuData.value.path
+
+  if (path.length === 0) {
+    showClipboardStatus('error', '无法删除根节点')
+    closeContextMenu()
+    return
+  }
+
+  try {
+    const parentPath = path.slice(0, -1)
+    const lastKey = path[path.length - 1]
+    const parent = parentPath.length === 0
+      ? parsedJson.value
+      : getValueByPath(parsedJson.value, parentPath)
+
+    if (parent === undefined || parent === null || typeof parent !== 'object') {
+      showClipboardStatus('error', '父节点无效，无法删除')
+      closeContextMenu()
+      return
+    }
+
+    const isAncestorOrEqual = (anc: (string|number)[], desc: (string|number)[]): boolean => {
+      if (anc.length > desc.length) return false
+      for (let i = 0; i < anc.length; i++) {
+        if (anc[i] !== desc[i]) return false
+      }
+      return true
+    }
+    // Why: 删除当前选中节点或其祖先会让选中路径悬空；数组中删除某索引会让后续兄弟整体前移
+    let needClearSelection = isAncestorOrEqual(path, selectedKeyPath.value)
+    if (!needClearSelection && Array.isArray(parent) && isAncestorOrEqual(parentPath, selectedKeyPath.value)) {
+      needClearSelection = true
+    }
+
+    if (Array.isArray(parent)) {
+      const index = typeof lastKey === 'number' ? lastKey : Number(lastKey)
+      if (Number.isNaN(index) || index < 0 || index >= parent.length) {
+        showClipboardStatus('error', '数组索引无效')
+        closeContextMenu()
+        return
+      }
+      parent.splice(index, 1)
+    } else {
+      const k = String(lastKey)
+      if (!(k in parent)) {
+        showClipboardStatus('error', '键不存在')
+        closeContextMenu()
+        return
+      }
+      delete (parent as Record<string, any>)[k]
+    }
+
+    inputJson.value = JSON.stringify(parsedJson.value, null, 2)
+
+    if (needClearSelection) {
+      selectedKeyPath.value = []
+      isEditing.value = false
+      editedValue.value = ''
+      previousKeyPath.value = []
+    }
+
+    addToHistory(parsedJson.value)
+
+    showClipboardStatus('success', `已删除: ${String(contextMenuData.value.key)}`)
+  } catch (err) {
+    showClipboardStatus('error', '删除失败: ' + (err instanceof Error ? err.message : String(err)))
+  }
+
+  closeContextMenu()
 }
 
 // 保存编辑的值
