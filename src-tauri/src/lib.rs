@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "console")]
 
 // 引入模块
+pub mod cli;
 pub mod cookie_bridge;
 pub mod desktop;
 pub mod task_branch_group;

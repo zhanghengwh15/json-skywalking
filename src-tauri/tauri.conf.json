@@ -48,7 +48,8 @@
         "installMode": "perMachine",
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": true,
-        "compression": "lzma"
+        "compression": "lzma",
+        "installerHooks": "installer.nsh"
       },
       "wix": {
         "language": ["zh-CN", "en-US"]
