@@ -82,7 +82,7 @@ TBD - created by archiving change add-domain-management. Update Purpose after ar
 - **THEN** 返回创建的 `Domain` 对象
 
 ### Requirement: Domain CRUD CLI 子命令
-系统 SHALL 支持 `dev-tools domain <action>` 子命令，直接读写 `data.db`：
+系统 SHALL 支持 `dev-tools-cli domain <action>` 子命令（Windows 控制台二进制；macOS DMG 仅装 GUI 二进制 `dev-tools`，命令名换成 `dev-tools` 即可），直接读写 `data.db`：
 - `list`：列出所有域
 - `create --domain-name <n> [--urls <json-array>] [--description <d>]`：创建
 - `get <id>`：查单条
@@ -91,11 +91,11 @@ TBD - created by archiving change add-domain-management. Update Purpose after ar
 - `match --url <url>`：URL 匹配
 
 #### Scenario: CLI 列出域
-- **WHEN** 终端执行 `dev-tools domain list`
+- **WHEN** 终端执行 `dev-tools-cli domain list`（macOS：`dev-tools domain list`）
 - **THEN** 打印格式化 JSON 数组到 stdout
 
 #### Scenario: CLI 创建域
-- **WHEN** 终端执行 `dev-tools domain create --domain-name example.com --urls '["https://example.com"]'`
+- **WHEN** 终端执行 `dev-tools-cli domain create --domain-name example.com --urls '["https://example.com"]'`（macOS：`dev-tools domain create ...`）
 - **THEN** 打印创建的域对象 JSON
 
 ### Requirement: 下游 Domain 列表与详情端点

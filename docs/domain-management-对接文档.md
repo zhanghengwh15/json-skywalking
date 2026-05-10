@@ -19,24 +19,31 @@ Domain 表包含 `id`、`domainName`、`urls`（JSON 数组，用于 URL 匹配�
 
 ### 命令行（适合脚本、不依赖 GUI）
 
-可执行文件名是 **`dev-tools`**。**DMG / Windows 安装包**只会把应用装进「应用程序」或「Program Files」，**不会在终端里注册 `dev-tools` 命令**；从源码编译时二进制在 `src-tauri/target/...`，同样默认不在 PATH。直接敲 `dev-tools` 会 `command not found` 是正常现象。
+项目提供两个二进制，子命令完全一致：
 
-**已用安装包的用户**：用 `.app` 里 `Contents/MacOS/dev-tools` 的全路径，或给该路径做 symlink / alias；**Windows** 用安装目录里的 `dev-tools.exe` 全路径或把该目录加入用户 Path。详见：[`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md) 第 **0** 节。
+- **Windows** NSIS 安装包同时装：
+  - `dev-tools.exe`（GUI 子系统）—— 双击启动主程序；cmd / git bash 里也能跑子命令
+  - `dev-tools-cli.exe`（Console 子系统）—— **PowerShell / 自动化脚本必须用这个**，否则 stdout 被吞
+- **macOS** DMG 仅装 `dev-tools`（位于 `.app/Contents/MacOS/dev-tools`）—— Terminal 直接调用即可，macOS 没有 Windows 那种 GUI 子系统不接管 stdout 的问题，因此**不需要** `dev-tools-cli`。
+
+直接敲命令前先把所在目录加进 PATH，或写全路径。安装与 PATH 详见：[`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md) 第 **0** 节。
 
 仅开发本机有仓库时，可不配置 PATH，在仓库根执行：
 
-`cargo run --manifest-path src-tauri/Cargo.toml -- domain list`
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --bin dev-tools-cli -- domain list
+```
 
-子命令统一为：`dev-tools domain <子命令> ...`（无子命令时会启动桌面应用，脚本里务必带子命令）。
+> 下表示例统一写 `dev-tools-cli`（Windows 推荐写法）。**macOS 把 `dev-tools-cli` 换成 `dev-tools` 即可**，子命令与参数完全相同。无子命令时会启动桌面应用（仅对 GUI 二进制 `dev-tools` 生效），脚本里务必带子命令。
 
 | 作用   | 示例 |
 |--------|------|
-| 列表   | `dev-tools domain list` |
-| 新建   | `dev-tools domain create --domain-name example.com --urls '["https://example.com"]'` |
-| 单条   | `dev-tools domain get 12` |
-| 更新   | `dev-tools domain update 12 --description "updated"`（至少改一个字段） |
-| 删除   | `dev-tools domain delete 12`（级联删除关联的 cookies / localStorage） |
-| 匹配   | `dev-tools domain match --url https://example.com/page` |
+| 列表   | `dev-tools-cli domain list` |
+| 新建   | `dev-tools-cli domain create --domain-name example.com --urls '["https://example.com"]'` |
+| 单条   | `dev-tools-cli domain get 12` |
+| 更新   | `dev-tools-cli domain update 12 --description "updated"`（至少改一个字段） |
+| 删除   | `dev-tools-cli domain delete 12`（级联删除关联的 cookies / localStorage） |
+| 匹配   | `dev-tools-cli domain match --url https://example.com/page` |
 
 输出为格式化 JSON，打印到标准输出。
 

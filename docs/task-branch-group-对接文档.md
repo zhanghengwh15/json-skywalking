@@ -17,23 +17,30 @@
 
 ### 命令行（适合脚本、不依赖 GUI）
 
-可执行文件名是 **`dev-tools`**。**DMG / Windows 安装包**只会把应用装进「应用程序」或「Program Files」，**不会在终端里注册 `dev-tools` 命令**；从源码编译时二进制在 `src-tauri/target/...`，同样默认不在 PATH。直接敲 `dev-tools` 会 `command not found` 是正常现象。  
+项目提供两个二进制，子命令完全一致：
 
-**已用安装包的用户**：用 `.app` 里 `Contents/MacOS/dev-tools` 的全路径，或给该路径做 symlink / alias；**Windows** 用安装目录里的 `dev-tools.exe` 全路径或把该目录加入用户 Path。详见：[`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md) 第 **0** 节。
+- **Windows** NSIS 安装包同时装：
+  - `dev-tools.exe`（GUI 子系统）—— 双击启动主程序；cmd / git bash 里也能跑子命令
+  - `dev-tools-cli.exe`（Console 子系统）—— **PowerShell / 自动化脚本必须用这个**，否则 stdout 被吞
+- **macOS** DMG 仅装 `dev-tools`（位于 `.app/Contents/MacOS/dev-tools`）—— Terminal 直接调用即可，macOS 没有 Windows 那种 GUI 子系统不接管 stdout 的问题，因此**不需要** `dev-tools-cli`。
+
+直接敲命令前先把所在目录加进 PATH，或写全路径。安装与 PATH 详见：[`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md) 第 **0** 节。
 
 仅开发本机有仓库时，可不配置 PATH，在仓库根执行：
 
-`cargo run --manifest-path src-tauri/Cargo.toml -- task-branch-group list`
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --bin dev-tools-cli -- task-branch-group list
+```
 
-子命令统一为：`dev-tools task-branch-group <子命令> ...`（无子命令时会启动桌面应用，脚本里务必带子命令）。
+> 下表示例统一写 `dev-tools-cli`（Windows 推荐写法）。**macOS 把 `dev-tools-cli` 换成 `dev-tools` 即可**，子命令与参数完全相同。无子命令时会启动桌面应用（仅对 GUI 二进制 `dev-tools` 生效），脚本里务必带子命令。
 
 | 作用   | 示例 |
 |--------|------|
-| 列表   | `dev-tools task-branch-group list` 可加 `--task-id xxx`、`--branch-name yyy` |
-| 新建   | `dev-tools task-branch-group create --tb-name a --task-id b --branch-name c --group-type 1` |
-| 单条   | `dev-tools task-branch-group get 12` |
-| 更新   | `dev-tools task-branch-group update 12 --branch-name new`（至少改一个字段） |
-| 删除   | `dev-tools task-branch-group delete 12`（软删除） |
+| 列表   | `dev-tools-cli task-branch-group list` 可加 `--task-id xxx`、`--branch-name yyy` |
+| 新建   | `dev-tools-cli task-branch-group create --tb-name a --task-id b --branch-name c --group-type 1` |
+| 单条   | `dev-tools-cli task-branch-group get 12` |
+| 更新   | `dev-tools-cli task-branch-group update 12 --branch-name new`（至少改一个字段） |
+| 删除   | `dev-tools-cli task-branch-group delete 12`（软删除） |
 
 输出为格式化 JSON，打印到标准输出。
 
@@ -140,9 +147,15 @@ HTTP 与桌面端共用该库；CLI 默认也打开该路径下的库。
 
 集成方应对 `success === false` 或 HTTP 状态码做分支处理；不要仅依赖 HTTP 200 推断业务成功（创建路径在异常时也可能返回错误 JSON + 非 2xx，以实际响应为准）。
 
-### 4. CLI 规格（`dev-tools`）
+### 4. CLI 规格（`dev-tools-cli` / `dev-tools`）
 
-**入口**：`dev-tools task-branch-group <action>`（若未将 `dev-tools` 加入 PATH，请用 `cargo run --manifest-path src-tauri/Cargo.toml -- …` 或目标目录下的完整路径；见 [`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md)。）
+**入口**：
+
+- Windows 推荐：`dev-tools-cli task-branch-group <action>`（console 子系统，PowerShell 兼容）
+- macOS：`dev-tools task-branch-group <action>`（DMG 仅装 GUI 二进制；macOS Terminal 不受 Windows 子系统问题影响）
+- 备选：`cargo run --manifest-path src-tauri/Cargo.toml --bin dev-tools-cli -- task-branch-group <action>` 或目标目录下完整路径；见 [`dev-tools-cli-安装与PATH.md`](dev-tools-cli-安装与PATH.md)。
+
+两个二进制共用 `src-tauri/src/cli.rs` 里的子命令定义，参数与行为完全一致。
 
 与 HTTP 的差异：**CLI 的 `list` 不支持 `keyword`**，仅支持 `--task-id`、`--branch-name`（对应 DB 精确筛选）。需要关键词模糊搜请用 HTTP 或扩展 CLI。
 
@@ -167,4 +180,4 @@ HTTP 与桌面端共用该库；CLI 默认也打开该路径下的库。
 
 ---
 
-文档版本与实现对齐：`task_branch_group/http.rs`、`task_branch_group/db.rs`、`src-tauri/src/main.rs`（CLI）、`cookie_bridge/mod.rs`（端口与 DB 路径）。
+文档版本与实现对齐：`task_branch_group/http.rs`、`task_branch_group/db.rs`、`src-tauri/src/cli.rs`（共享 CLI 定义）、`src-tauri/src/main.rs`（GUI 二进制入口）、`src-tauri/src/bin/dev-tools-cli.rs`（控制台二进制入口）、`cookie_bridge/mod.rs`（端口与 DB 路径）。

@@ -10,7 +10,7 @@ The system SHALL allow creating a task-branch-group association record with tb_n
 - **THEN** the system inserts a new record and returns the created object with id
 
 #### Scenario: Successful creation via CLI
-- **WHEN** user runs `dev-tools.exe task-branch-group create --tb-name <n> --task-id <id> --branch-name <b> --group-type <1|2>`
+- **WHEN** user runs `dev-tools-cli task-branch-group create --tb-name <n> --task-id <id> --branch-name <b> --group-type <1|2>`
 - **THEN** the system inserts a new record and prints the created record as JSON
 
 ### Requirement: Read task branch group records
@@ -25,7 +25,7 @@ The system SHALL support querying task branch group records by id or listing rec
 - **THEN** the system returns records whose `tb_name` OR `task_id` contains the keyword (LIKE %kw%)
 
 #### Scenario: Exact filter via task_id and/or branch_name (HTTP, CLI)
-- **WHEN** GET `/api/task-branch-groups?task_id=<id>&branch_name=<b>` is called, or `dev-tools.exe task-branch-group list --task-id <id> --branch-name <b>` is run
+- **WHEN** GET `/api/task-branch-groups?task_id=<id>&branch_name=<b>` is called, or `dev-tools-cli task-branch-group list --task-id <id> --branch-name <b>` is run
 - **THEN** the system returns records that exactly match every provided filter (AND-combined)
 
 #### Scenario: Get single record by id
@@ -44,7 +44,7 @@ The system SHALL allow updating tb_name, task_id, branch_name, group_type, and r
 - **THEN** the system updates the record and returns the updated object
 
 #### Scenario: Update via CLI
-- **WHEN** user runs `dev-tools.exe task-branch-group update <id> --branch-name <new>`
+- **WHEN** user runs `dev-tools-cli task-branch-group update <id> --branch-name <new>`
 - **THEN** the system updates the specified fields and prints the updated record
 
 ### Requirement: Delete task branch group record
@@ -59,7 +59,7 @@ The system SHALL support soft-deleting a record by setting rec_status to 0.
 - **THEN** the system sets rec_status to 0 and returns success
 
 #### Scenario: Delete via CLI
-- **WHEN** user runs `dev-tools.exe task-branch-group delete <id>`
+- **WHEN** user runs `dev-tools-cli task-branch-group delete <id>`
 - **THEN** the system performs soft delete and prints confirmation
 
 ### Requirement: Database schema initialization
