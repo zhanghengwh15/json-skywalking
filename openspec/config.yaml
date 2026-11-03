@@ -1,20 +1,18 @@
 schema: spec-driven
-
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+context: |
+  项目为 Dev Tools 本地桌面开发工具箱，前端使用 Vue 3、TypeScript、Vite、Pinia、Vue Router，桌面使用 Tauri 2 与 Rust。
+  已有 JSON / SQL / HTTP 解析、时间戳转换、Cookie Bridge（含域名管理）、任务分支管理六个页面。
+  本地 Axum HTTP 服务当前监听 127.0.0.1:8765，与 Tauri IPC 和 CLI 共用 SQLite 数据；主库在应用数据目录的 data.db。
+  Rust 按功能模块划分 commands.rs、http.rs、db.rs；入口和 command 注册位于 src-tauri/src/lib.rs，CLI 共用逻辑在 cli.rs。
+  主要平台为 macOS 和 Windows，注意 GUI 与 console 二进制、安装与 PATH 差异。
+  项目约定见 AGENTS.md；文档任务先读取 .codex/rules/common/docs-prd.md，相关技能位于 .agents/skills/。
+  需求文档写入 docs/产品文档/{需求}/，通过 MOC.md 关联；OpenSpec 产物保留在 openspec/ 下，现有对接文档保留路径并增量更新。
+  默认中文编写，区分当前实现、拟新增方案、待确认项和实际验证结果，不虚构接口、文件、依赖或通过记录。
+rules:
+  proposal:
+    - 明确用户问题、目标、本期范围及受影响模块，关联已存在的需求文档。
+  design:
+    - 按实际影响核对 Vue IPC、HTTP、CLI、SQLite 升级和平台兼容，说明拟新增与现有行为的区别。
+    - 涉及发布或数据变更时说明升级、验证与回退，契约细节引用同一份对接文档。
+  tasks:
+    - 按可验证结果拆分实施任务，包含相关文档同步和适用验证，不将测试计划写成已通过。
