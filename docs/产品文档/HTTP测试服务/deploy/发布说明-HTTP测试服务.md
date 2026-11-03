@@ -58,6 +58,7 @@ related-code:
 | `node --test tests/httpTestServer.test.mjs` | 通过 | 4 个 MD 测试：当前配置内容、POSIX URL 引号、Markdown 围栏及非法配置 |
 | `openspec validate add-http-test-server --strict` | 通过 | 规格和任务格式 |
 | ego-browser 页面检查 | 通过 | 端口 / URL / 固定 JSON 编辑、添加接口、MD 预览更新、非法 JSON 提示、日志页导航与空态 |
+| ego-browser + 模拟 IPC 交互 | 通过 | 启停状态、运行中禁止修改、导出内容与反馈、日志详情、方法及 URL 筛选、清空后同步移除详情；不代表原生 IPC 或文件写入实测 |
 | Tauri 原生交互及文件导出 | 未执行 | 未启动新的完整桌面应用，也未写入用户下载目录；浏览器预览不能证明原生能力通过 |
 | Windows 安装与运行 | 未执行 | 未做 Windows 实机、安装包或跨平台验收 |
 | 生产安装包与用户业务验收 | 未执行 | 本次没有发布或安装操作 |
