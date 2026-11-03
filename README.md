@@ -1,6 +1,6 @@
 # Tauri App
 
-Dev Tools 是基于 Tauri 的本地桌面开发工具箱，包含以下六个功能页面，并提供本地 HTTP 与 CLI 对接能力。
+Dev Tools 是基于 Tauri 的本地桌面开发工具箱，核心功能如下，并提供本地 HTTP 与 CLI 对接能力。
 
 ## 功能页面
 
@@ -16,14 +16,18 @@ Dev Tools 是基于 Tauri 的本地桌面开发工具箱，包含以下六个功
 - HTTP 请求内容解析与格式化
 - 支持历史记录、请求预览、快捷操作
 
-### 4. 时间戳转换
+### 4. cURL 格式化
+- 转换为面向旧版 Linux cURL 7.29 的常用参数写法，支持 `-d` / `--data-binary`
+- 处理浏览器导出引号、Markdown URL、多行排版与复制；仅本地转换
+
+### 5. 时间戳转换
 - 时间戳与日期时间转换
 
-### 5. Cookie Bridge
+### 6. Cookie Bridge
 - 接收浏览器扩展推送的 Cookie / localStorage
 - 域名管理、关联数据查看与本地接口查询
 
-### 6. 任务分支管理
+### 7. 任务分支管理
 - 管理 TB 任务与 Git 分支的关联关系
 - 支持页面操作、本地 HTTP 与 CLI 调用
 

@@ -2,6 +2,16 @@ import { createRouter, createWebHistory, Router } from 'vue-router'
 
 const routes = [
   {
+    path: '/http-test-server',
+    name: 'HttpTestServer',
+    component: () => import('../views/HttpTestServer.vue')
+  },
+  {
+    path: '/http-test-logs',
+    name: 'HttpTestLogs',
+    component: () => import('../views/HttpTestLogs.vue')
+  },
+  {
     path: '/json-parser',
     name: 'JsonParser',
     component: () => import('../views/JsonParser.vue')
@@ -15,6 +25,11 @@ const routes = [
     path: '/http-parser',
     name: 'HttpParser',
     component: () => import('../views/HttpParser.vue')
+  },
+  {
+    path: '/curl-formatter',
+    name: 'CurlFormatter',
+    component: () => import('../views/CurlFormatter.vue')
   },
   {
     path: '/cookie-bridge',
@@ -42,4 +57,4 @@ const router: Router = createRouter({
   routes
 })
 
-export default router 
+export default router

@@ -4,6 +4,7 @@
 pub mod cli;
 pub mod cookie_bridge;
 pub mod desktop;
+pub mod http_test_server;
 pub mod task_branch_group;
 
 // 重新导出需要的类型
@@ -68,11 +69,19 @@ pub fn run() {
             task_branch_group::commands::task_branch_group_get,
             task_branch_group::commands::task_branch_group_update,
             task_branch_group::commands::task_branch_group_delete,
+            http_test_server::commands::http_test_server_status,
+            http_test_server::commands::http_test_server_start,
+            http_test_server::commands::http_test_server_stop,
+            http_test_server::commands::http_test_server_logs,
+            http_test_server::commands::http_test_server_log,
+            http_test_server::commands::http_test_server_clear_logs,
+            http_test_server::commands::http_test_server_export_markdown,
         ])
         .on_window_event(|window, event| {
             desktop::tray::handle_window_event(window, event);
         })
         .setup(|app| {
+            http_test_server::init(app)?;
             // 设置系统托盘
             if let Err(e) = desktop::tray::setup_tray(app) {
                 eprintln!("[Tray] 设置系统托盘失败: {}", e);

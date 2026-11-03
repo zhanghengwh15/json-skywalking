@@ -84,6 +84,26 @@ docs/产品文档/{需求}/
 10. 验收标准：编号如 `AC-01`，覆盖适用的正常、异常与兼容场景。
 11. 待确认与依赖：确认来源、已知负责人及对范围的影响；未知负责人不虚构。
 
+## cURL 示例规范
+
+项目接口文档中的 Linux cURL 示例默认以 **cURL 7.29 + sh / bash** 为兼容目标；用户明确其他版本时按其要求调整。
+
+- JSON 正文使用 `-d` 或 `--data-binary`，显式添加 `Content-Type: application/json`。需要保留原始正文 / 文件字节时优先 `--data-binary`。
+- 不直接使用 `--json`、`--data-raw` 等较新选项；将 `--json` 转换时还需保留其 `Accept: application/json` 语义，已有自定义头优先。
+- 使用纯 URL，不把 `[地址](地址)` 的 Markdown 链接粘进命令。Shell 参数使用 POSIX 单引号；正文中的单引号用 `'\''` 拼接，不能在普通单引号内用 `\'` 代替。
+- 多行续行的反斜杠必须紧接换行，不能在其后追加空格或说明。操作说明单独成段，不附在命令末尾。
+- JSON、SQL、`${...}` 业务模板占位符和大整数 ID 保持原文；不通过 JSON 重新序列化“格式化”正文。区分 Shell 变量与需原样发送的业务模板。
+- `--data-raw '@文字'` 是字面正文，不能直接改成读取文件的 `-d '@文字'`。`-d @文件` 与 `--data-binary @文件` 对换行的处理也不同，不相互盲目替换。
+- 未知参数与较新网络 / TLS 选项需核实兼容性，不能悄悄删除或宣称已在目标服务器验证。记录实际验证环境。
+- 可以用“cURL格式化”菜单生成兼容命令；文档只用虚构凭据，命令生成与真实请求执行分别记录。
+
+```bash
+curl --url 'https://example.com/api/query' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  --data-binary '{"sql":"SELECT * FROM orders WHERE status = '\''ready'\''","limit":10}'
+```
+
 ## 文档元数据与状态
 
 新 PRD、LLD、FLD、发布说明和测试用例使用以下 frontmatter；既有对接文档无需批量补齐。日期用实际创建或修改日期，代码路径只登记真实存在的文件；拟新增文件在设计正文另列。

@@ -2,7 +2,7 @@
 
 ## 项目介绍
 
-Dev Tools 是面向开发者的本地桌面工具箱，使用 Vue 3 + TypeScript + Vite 构建界面，使用 Tauri 2 + Rust 提供桌面能力。已有 JSON 解析、SQL 解析、HTTP 解析、时间戳转换、Cookie Bridge、任务分支管理六个页面。Cookie Bridge 内含域名管理，接收浏览器扩展推送的 Cookie / localStorage，并提供本地查询与持久化能力。
+Dev Tools 是面向开发者的本地桌面工具箱，使用 Vue 3 + TypeScript + Vite 构建界面，使用 Tauri 2 + Rust 提供桌面能力。主要工具包括 JSON 解析、SQL 解析、HTTP 解析、cURL 格式化、时间戳转换、Cookie Bridge、任务分支管理等。Cookie Bridge 内含域名管理，接收浏览器扩展推送的 Cookie / localStorage，并提供本地查询与持久化能力。
 
 - 前端入口：`src/main.ts`；应用布局：`src/App.vue`；路由：`src/router/index.ts`。
 - Rust 库入口与 command 注册：`src-tauri/src/lib.rs`。
@@ -15,7 +15,7 @@ Dev Tools 是面向开发者的本地桌面工具箱，使用 Vue 3 + TypeScript
 
 | 路径 | 用途 |
 | --- | --- |
-| `src/views/` | 六个工具页面 |
+| `src/views/` | 工具页面 |
 | `src/utils/` | 前端工具函数 |
 | `src/assets/styles/` | 页面样式 |
 | `src-tauri/src/desktop/` | 剪贴板、历史存储、托盘与快捷键 |
@@ -49,6 +49,7 @@ npm ci
 npm run dev
 npm run tauri dev
 npm run build
+npm run test:curl
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri build

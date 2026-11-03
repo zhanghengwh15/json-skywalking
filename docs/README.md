@@ -7,12 +7,16 @@
 | [Cookie Bridge 对接](cookie-bridge-对接文档.md) | 浏览器扩展推送、HTTP / IPC 查询与本地存储 |
 | [域名管理对接](domain-management-对接文档.md) | 域名 CRUD、URL 匹配、关联数据和 CLI |
 | [任务分支管理对接](task-branch-group-对接文档.md) | 任务分支关联、HTTP / IPC / CLI 与软删除 |
+| [HTTP 测试服务对接](http-test-server-对接文档.md) | 可配置本机端口、固定响应、请求日志与 MD 导出 |
 | [CLI 安装与 PATH](dev-tools-cli-安装与PATH.md) | macOS / Windows 安装、双二进制与命令行使用 |
 | [Git 合并远程](git-合并远程.md) | 已有 Git 操作说明 |
 
 ## 需求文档
 
 新需求归档到 `docs/产品文档/{需求}/`，通过需求下的 `MOC.md` 关联 PRD、FLD、LLD、发布说明和测试用例。新增需求时在本节追加 MOC 链接，按需创建目录。
+
+- [cURL 格式化](产品文档/cURL格式化/MOC.md)：旧版 Linux 命令转换、页面设计和验证记录。
+- [HTTP 测试服务](产品文档/HTTP测试服务/MOC.md)：端口与 URL 配置、固定响应、请求日志和 MD 使用说明。
 
 现有对接文档保持原路径，接口变动时持续更新。OpenSpec 变更仍在 `openspec/` 管理，由对应需求 MOC 链接。
 

@@ -1,7 +1,7 @@
 schema: spec-driven
 context: |
   项目为 Dev Tools 本地桌面开发工具箱，前端使用 Vue 3、TypeScript、Vite、Pinia、Vue Router，桌面使用 Tauri 2 与 Rust。
-  已有 JSON / SQL / HTTP 解析、时间戳转换、Cookie Bridge（含域名管理）、任务分支管理六个页面。
+  主要工具包括 JSON / SQL / HTTP 解析、cURL 格式化、时间戳转换、Cookie Bridge（含域名管理）、任务分支管理等。
   本地 Axum HTTP 服务当前监听 127.0.0.1:8765，与 Tauri IPC 和 CLI 共用 SQLite 数据；主库在应用数据目录的 data.db。
   Rust 按功能模块划分 commands.rs、http.rs、db.rs；入口和 command 注册位于 src-tauri/src/lib.rs，CLI 共用逻辑在 cli.rs。
   主要平台为 macOS 和 Windows，注意 GUI 与 console 二进制、安装与 PATH 差异。

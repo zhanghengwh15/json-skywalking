@@ -1,0 +1,60 @@
+.test-tool { height: 100%; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.test-header, .test-actions, .test-section-title, .test-port, .test-endpoint-fields, .test-filters { display: flex; align-items: center; gap: 12px; }
+.test-header, .test-section-title { justify-content: space-between; }
+.test-header { flex-shrink: 0; flex-wrap: wrap; }
+.test-header h1 { font-size: 28px; margin: 0 0 6px; }
+.test-header p, .test-help, .test-port p { color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 0; }
+.test-actions { flex-wrap: wrap; }
+.test-actions a { text-decoration: none; }
+.test-panel { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 12px; padding: 20px; }
+.test-tool h2 { font-size: 16px; margin: 0; }
+.test-tool h2 span { color: var(--text-muted); font-size: 12px; margin-left: 8px; }
+.test-tool h3 { font-size: 13px; margin: 20px 0 8px; color: var(--text-secondary); }
+.test-tool label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.test-tool input, .test-tool select, .test-tool textarea { border: 1px solid var(--border-default); background: var(--bg-secondary); border-radius: 8px; color: var(--text-primary); font: inherit; padding: 9px 12px; outline: none; min-width: 0; }
+.test-tool input:focus, .test-tool select:focus, .test-tool textarea:focus { border-color: var(--accent-primary); }
+.test-tool input:disabled, .test-tool select:disabled, .test-tool textarea:disabled { opacity: .65; }
+.test-tool textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.6; width: 100%; }
+.test-port { flex-wrap: wrap; }
+.test-port input { width: 160px; }
+.test-status { color: var(--text-muted); background: var(--bg-elevated); border-radius: 20px; padding: 6px 12px; font-size: 12px; }
+.test-status.running { color: #91dfb1; background: rgba(87, 190, 125, .12); }
+.test-endpoint { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-default); }
+.test-endpoint-fields { align-items: end; }
+.test-endpoint-fields input[type='number'] { width: 100px; }
+.test-grow { flex: 1; min-width: 0; }
+.test-url { display: block; padding: 12px 0; color: var(--accent-secondary); overflow-wrap: anywhere; font-size: 13px; }
+.test-endpoint .test-help { margin-top: 8px; }
+.test-message { font-size: 13px; line-height: 1.6; padding: 12px 16px; border-radius: 8px; background: var(--bg-elevated); margin: 0; overflow-wrap: anywhere; }
+.test-error { color: #ff9f9f; }
+.test-success { color: #91dfb1; }
+.test-tool pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--bg-primary); padding: 14px; border-radius: 8px; max-height: 480px; overflow: auto; margin: 12px 0 0; }
+.test-markdown summary { cursor: pointer; color: var(--accent-primary); font-size: 14px; }
+.test-logs-page { overflow: hidden; }
+.test-filters { flex-wrap: wrap; }
+.test-filters > input { flex: 1; min-width: 180px; }
+.test-checkbox { flex-direction: row !important; align-items: center; white-space: nowrap; }
+.test-log-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; min-height: 0; flex: 1; }
+.test-log-list { min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
+.test-table-scroll { height: 100%; overflow: auto; }
+.test-log-list table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.test-log-list th { position: sticky; top: 0; background: var(--bg-elevated); text-align: left; padding: 12px; z-index: 1; }
+.test-log-list th:first-child { width: 155px; }
+.test-log-list th:last-child { width: 90px; }
+.test-log-list td { border-top: 1px solid var(--border-default); padding: 12px; vertical-align: top; overflow-wrap: anywhere; }
+.test-log-list small, .test-log-list strong { display: block; margin: 4px 0; }
+.test-log-list small { color: var(--text-muted); }
+.test-log-list tr.selected, .test-log-list tbody tr:hover { background: rgba(214, 186, 255, .06); }
+.test-log-link { color: var(--accent-secondary); background: transparent; border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.test-log-link:hover { text-decoration: underline; }
+.test-log-link:focus-visible { outline: 1px solid var(--accent-primary); }
+.test-log-detail { overflow: auto; min-width: 0; }
+.test-log-detail dl { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 10px; font-size: 12px; line-height: 1.6; }
+.test-log-detail dt { color: var(--text-muted); }
+.test-log-detail dd { margin: 0; overflow-wrap: anywhere; }
+.test-empty { color: var(--text-muted); text-align: center; padding: 40px 16px !important; font-size: 13px; line-height: 1.8; }
+@media (max-width: 1100px) {
+  .test-log-layout { grid-template-columns: 1fr; overflow: auto; }
+  .test-log-list { min-height: 260px; }
+  .test-log-detail { overflow: visible; }
+}
