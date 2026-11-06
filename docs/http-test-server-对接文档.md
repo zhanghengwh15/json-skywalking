@@ -1,15 +1,16 @@
 # HTTP 测试服务对接文档
 
-版本：1.0；更新日期：2026-11-03；状态：已按代码核实。实现完成，实际验证与未测范围见[发布说明](产品文档/HTTP测试服务/deploy/发布说明-HTTP测试服务.md)。
+版本：1.1；更新日期：2026-11-06；状态：已按代码核实。实现完成，实际验证与未测范围见[发布说明](产品文档/HTTP测试服务/deploy/发布说明-HTTP测试服务.md)。
 
 ## 使用方法
 
 1. 打开 Dev Tools 桌面应用的「测试服务」。默认监听 `127.0.0.1:8766`，默认接口为 `ANY /test`，返回 HTTP 200。
-2. 按需修改端口，添加多个 URL 路径，选择方法、状态码，填写固定 JSON 响应。
+2. 按需修改端口，添加多个 URL 路径，选择方法、状态码，填写自定义响应体及响应类型（Content-Type）。默认保留原有 JSON 示例，可以全部替换为 JSON、文本、HTML、XML 或空内容。
 3. 点击「启动服务」，用 curl、Postman 或程序向页面展示的地址发送请求。输入参数无必填字段，不需要声明参数结构。
 4. 打开「请求日志」查看接收时间、来源、请求头、正文、状态码和实际返回体；可按 URL、端口、状态码或方法筛选，点击 URL 查看详情。
 5. 展开「MD 使用说明预览」，点击「导出 MD」，文档保存到系统下载目录，页面显示完整保存位置。文档按当前页面配置生成，包含 curl 示例。
 6. 修改运行配置前先点击「停止服务」。关闭窗口会进入托盘，服务继续运行；停止服务或退出应用才结束监听。
+7. 点击接口旁「生成 cURL」可查看只读命令并复制；也可在接口中点击或聚焦后按 `⌘ / Ctrl + Alt + C`，未选择时使用第一个接口。运行中同样可生成命令；生成操作不发送请求，命令使用生成时的配置，修改配置后请重新生成。复制失败时可从命令框手动复制。
 
 默认请求示例，兼容 cURL 7.29 + sh / bash；Windows 可用 Git Bash 或 WSL：
 
@@ -31,6 +32,10 @@ curl -X POST --url 'http://127.0.0.1:8766/test?source=example' \
 
 入参不会参与生成响应。表单、文本、任意合法 HTTP 请求头、任意查询参数和空请求体均可；JSON 请求体无需符合任何业务 schema，甚至无需是合法 JSON。
 
+每个接口的返回值独立配置，不要求保留 `code`、`message`、`data`；也可以返回数组、标量 JSON 或空字符串。正文按填写的 UTF-8 原文发送，保留空白与换行，不做 JSON 校验、重新序列化或自动包装。即使响应类型声明为 JSON，也允许输入非 JSON 文本，调用方按实际正文处理。
+
+例如将响应类型设为 `text/plain; charset=utf-8`，响应体填入 `hello test`，该接口就返回这段文本。页面默认示例和状态码保持原值。
+
 ## HTTP 行为
 
 | 项目 | 实际行为 |
@@ -41,8 +46,8 @@ curl -X POST --url 'http://127.0.0.1:8766/test?source=example' \
 | 方法 | 可配置 ANY、GET、POST、PUT、PATCH、DELETE、HEAD；ANY 接受任意方法，OPTIONS 总是自动预检 |
 | 匹配 | 方法和路径精确匹配，查询参数不参与；末尾 `/` 有区别；不会把 `:id`、`*` 当作路由变量 |
 | 接口数量 | 1–50 个；同方法同路径不重复，同路径 ANY 不能和其他方法重叠 |
-| 返回 | 每个接口配置固定 JSON 字符串及整数状态码 200–599；JSON 必须有效，最大 64 KiB；响应不附加业务包装，保留配置的 JSON 原文 |
-| 响应头 | `Content-Type: application/json; charset=utf-8` |
+| 返回 | 每个接口配置独立响应字符串及整数状态码 200–599；允许任意 UTF-8 文本及空内容，最大 64 KiB（按 UTF-8 字节计算）；原样返回，无业务包装，不强制 JSON |
+| 响应头 | 每个接口可配置 `contentType`，默认 `application/json; charset=utf-8`；1–256 个可打印 ASCII 字符，不可全为空格或含换行；系统错误与预检仍使用原有 JSON 类型 |
 | 空响应 | HEAD、HTTP 204 / 205 / 304 不返回正文 |
 | 404 | 路径或方法未匹配，返回 `{"error":"未配置该路径或请求方法"}` |
 | OPTIONS | 任意路径返回 204，无正文，记录日志 |
@@ -68,7 +73,7 @@ HTTP 协议解析在处理器前失败的连接不属于应用请求日志范围
 | `http_test_server_clear_logs` | 无 | `null`，清空日志，ID 序列继续增长 |
 | `http_test_server_export_markdown` | `{ content: string }`，不超过 4 MiB 的 UTF-8 文档 | 保存后的完整文件路径字符串 |
 
-`ServerConfig` 字段全部必填、不允许 null：
+`ServerConfig` 除 `contentType` 可省略外，字段全部必填、不允许 null；`contentType` 显式传 null 也不接受：
 
 | 字段 | 类型 | 默认 / 约束 |
 | --- | --- | --- |
@@ -77,7 +82,8 @@ HTTP 协议解析在处理器前失败的连接不属于应用请求日志范围
 | `endpoints[].method` | string | 默认 ANY |
 | `endpoints[].path` | string | 默认 /test |
 | `endpoints[].statusCode` | number，Rust u16 | 默认 200 |
-| `endpoints[].responseBody` | string | 默认响应见上文；内容是 JSON 原文字符串，不能直接传对象 |
+| `endpoints[].responseBody` | string | 默认响应见上文；任意 UTF-8 原文字符串，可为 `""`，不能直接传对象；最多 64 KiB |
+| `endpoints[].contentType` | string，可省略 | 默认 `application/json; charset=utf-8`，缺省自动补齐；显式空字符串非法；校验见 HTTP 行为 |
 
 `ServerStatus`：`running: boolean`、`config: ServerConfig`、`lastError: string | null`。配置文件损坏时回退默认配置，并通过 `lastError` 提示；成功启动后清除错误。
 
@@ -101,9 +107,12 @@ HTTP 协议解析在处理器前失败的连接不属于应用请求日志范围
 
 配置保存到 Tauri 应用数据目录的 `http-test-server.json`，不读写现有 SQLite 数据。导出文件名称为 `HTTP测试服务-日期时间-随机数.md`，使用独占创建避免覆盖文件。
 
+旧配置无需手动迁移，读取时补齐默认 `contentType`，下次成功启动时保存新增字段。回退到仅接受 JSON 的旧实现前，需要备份配置或将正文恢复为合法 JSON，否则旧版本会报配置错误并回退默认配置。
+
 ## 其他入口及本次差异
 
 - 现有 8765 HTTP、Cookie Bridge、域名和任务分支接口没有变更。
 - 新增服务由桌面 IPC 管理；没有新的远程管理 HTTP API 或 CLI 子命令，CLI 不会自动启动此服务。
 - 新增两个页面 `/http-test-server`、`/http-test-logs`；浏览器预览支持配置与 MD 预览，原生能力按钮明确不可用。
 - 原文档没有本模块契约，本次按新增 Rust DTO、HTTP 处理器和 Vue IPC 消费补齐，未修改其他模块字段命名。
+- 2026-11-06：原实现仅允许合法 JSON 且类型固定；本次移除 JSON 校验、新增兼容缺省的 `contentType`，匹配接口按配置类型和原文响应；IPC command 名称及 CLI / 旧 HTTP 入口不变。页面和 MD 共用 cURL 生成器，ANY 使用 POST，HEAD 使用 `--head`，正文使用 cURL 7.29 支持的 `--data-binary`。

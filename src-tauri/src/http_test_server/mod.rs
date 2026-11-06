@@ -17,6 +17,10 @@ pub const MAX_LOGS: usize = 200;
 pub const MAX_LOG_BODY: usize = 64 * 1024;
 pub const MAX_REQUEST_BODY: usize = 1024 * 1024;
 
+fn default_content_type() -> String {
+    "application/json; charset=utf-8".into()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Endpoint {
@@ -24,6 +28,8 @@ pub struct Endpoint {
     pub path: String,
     pub status_code: u16,
     pub response_body: String,
+    #[serde(default = "default_content_type")]
+    pub content_type: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -43,6 +49,7 @@ impl Default for ServerConfig {
                 status_code: 200,
                 response_body: "{\n  \"code\": 0,\n  \"message\": \"ok\",\n  \"data\": null\n}"
                     .into(),
+                content_type: default_content_type(),
             }],
         }
     }
@@ -80,8 +87,18 @@ impl ServerConfig {
             if endpoint.response_body.len() > MAX_LOG_BODY {
                 return Err(format!("接口 {} 固定响应不能超过 64 KiB", index + 1));
             }
-            serde_json::from_str::<serde_json::Value>(&endpoint.response_body)
-                .map_err(|error| format!("接口 {} 固定响应不是有效 JSON：{error}", index + 1))?;
+            if endpoint.content_type.trim().is_empty()
+                || endpoint.content_type.len() > 256
+                || !endpoint
+                    .content_type
+                    .bytes()
+                    .all(|byte| (0x20..=0x7e).contains(&byte))
+            {
+                return Err(format!(
+                    "接口 {} 响应类型需为 1–256 个可打印 ASCII 字符，不能全为空格或包含换行",
+                    index + 1
+                ));
+            }
             if self.endpoints[..index].iter().any(|previous| {
                 previous.path == endpoint.path
                     && (previous.method == endpoint.method

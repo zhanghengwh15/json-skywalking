@@ -5,6 +5,7 @@ export interface TestEndpoint {
   path: string
   statusCode: number
   responseBody: string
+  contentType?: string
 }
 
 export interface TestServerConfig {
@@ -43,6 +44,7 @@ export function newEndpoint(): TestEndpoint {
     path: '/test',
     statusCode: 200,
     responseBody: JSON.stringify({ code: 0, message: 'ok', data: null }, null, 2),
+    contentType: 'application/json; charset=utf-8',
   }
 }
 
@@ -65,12 +67,19 @@ export function validateTestConfig(config: TestServerConfig): void {
       throw new Error(prefix + '状态码需为 200–599')
     }
     if (new TextEncoder().encode(endpoint.responseBody).length > 64 * 1024) throw new Error(prefix + '固定响应不能超过 64 KiB')
-    try { JSON.parse(endpoint.responseBody) } catch { throw new Error(prefix + '固定响应需要是有效 JSON') }
+    const contentType = responseContentType(endpoint)
+    if (!contentType.trim() || contentType.length > 256 || /[^\x20-\x7e]/.test(contentType)) {
+      throw new Error(prefix + '响应类型需为 1–256 个可打印 ASCII 字符，不能全为空格或包含换行')
+    }
     if (config.endpoints.slice(0, index).some(previous => previous.path === endpoint.path &&
       (previous.method === endpoint.method || previous.method === 'ANY' || endpoint.method === 'ANY'))) {
       throw new Error(prefix + '路径与方法重复或与 ANY 冲突')
     }
   })
+}
+
+export function responseContentType(endpoint: TestEndpoint): string {
+  return endpoint.contentType ?? 'application/json; charset=utf-8'
 }
 
 function fenced(text: string, language = ''): string {
@@ -83,23 +92,31 @@ function shellQuote(value: string): string {
   return "'" + value.replace(/'/g, "'\"'\"'") + "'"
 }
 
+export function testEndpointCurl(config: TestServerConfig, index: number): string {
+  const endpoint = config.endpoints[index]
+  if (!endpoint) throw new Error('请选择要生成 cURL 的接口')
+  validateTestConfig({ port: config.port, endpoints: [endpoint] })
+  const url = `http://127.0.0.1:${config.port}${endpoint.path}`
+  const method = endpoint.method === 'ANY' ? 'POST' : endpoint.method
+  if (method === 'HEAD') return `curl --head --url ${shellQuote(url)}`
+  return `curl -X ${method} --url ${shellQuote(url)} -H 'Content-Type: application/json' --data-binary '{"example":"任意值","count":1}'`
+}
+
 export function testServerMarkdown(config: TestServerConfig): string {
   validateTestConfig(config)
   const base = `http://127.0.0.1:${config.port}`
   const sections = config.endpoints.map((endpoint, index) => {
     const url = base + endpoint.path
     const method = endpoint.method === 'ANY' ? 'POST' : endpoint.method
-    const curl = method === 'HEAD'
-      ? `curl --head --url ${shellQuote(url)}`
-      : `curl -X ${method} --url ${shellQuote(url)} -H 'Content-Type: application/json' --data '{"example":"任意值","count":1}'`
+    const curl = testEndpointCurl(config, index)
     const noBody = method === 'HEAD' || [204, 205, 304].includes(endpoint.statusCode)
     return [
       `## 接口 ${index + 1}`,
       fenced(`${endpoint.method} ${url}`, 'text'),
       endpoint.method === 'ANY' ? '方法：接受任意 HTTP 方法；OPTIONS 用于自动预检，返回 204。' : `方法：${endpoint.method}。`,
       '入参：无必填字段，查询参数、请求头及 JSON、表单、文本或空请求体均可任意填写，不做业务校验。URL 路径和方法精确匹配，查询参数不影响匹配。',
-      `固定响应：HTTP ${endpoint.statusCode}，Content-Type 为 application/json; charset=utf-8。`,
-      noBody ? '此状态码或 HEAD 方法按 HTTP 规则不返回响应体。' : fenced(endpoint.responseBody, 'json'),
+      `自定义响应：HTTP ${endpoint.statusCode}，Content-Type 为 ${responseContentType(endpoint)}。`,
+      noBody ? '此状态码或 HEAD 方法按 HTTP 规则不返回响应体。' : fenced(endpoint.responseBody, 'text'),
       '调用示例（macOS / Linux shell；Windows 可使用 Git Bash 或 WSL）：',
       fenced(curl, 'bash'),
     ].join('\n\n')
@@ -109,6 +126,7 @@ export function testServerMarkdown(config: TestServerConfig): string {
     '## 启动',
     `在 Dev Tools 桌面应用的「测试服务」页面配置端口 ${config.port} 和下列接口，然后点击「启动服务」。仅本机访问，基础地址为 ${base}。`,
     '此文档根据当前页面配置生成；编辑后需停止并重新启动服务才能生效。应用重启后不会自动监听。关闭窗口会进入托盘，需停止服务或退出应用才会结束监听。',
+    '每个接口的响应体独立配置，默认是 code、message、data 的 JSON 示例，可完整替换为任意 JSON、文本、HTML、XML 或空内容，最多 64 KiB。响应按填写原文返回，不自动包装、格式化或校验 JSON；响应类型可自行修改。',
     ...sections,
     '## 请求日志与边界',
     '打开「请求日志」查看时间、来源、方法、URL、请求头、请求体、状态码、耗时和响应。最近 200 条仅保存在当前应用会话中，退出后清除；停止服务不会清除日志。请求头中的常见凭据会隐藏，正文及 URL 不脱敏，请仅发送测试数据。',

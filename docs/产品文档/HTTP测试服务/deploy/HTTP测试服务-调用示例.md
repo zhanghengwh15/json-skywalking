@@ -6,6 +6,8 @@
 
 此文档根据当前页面配置生成；编辑后需停止并重新启动服务才能生效。应用重启后不会自动监听。关闭窗口会进入托盘，需停止服务或退出应用才会结束监听。
 
+每个接口的响应体独立配置，默认是 code、message、data 的 JSON 示例，可完整替换为任意 JSON、文本、HTML、XML 或空内容，最多 64 KiB。响应按填写原文返回，不自动包装、格式化或校验 JSON；响应类型可自行修改。
+
 ## 接口 1
 
 ```text
@@ -16,9 +18,9 @@ ANY http://127.0.0.1:8766/test
 
 入参：无必填字段，查询参数、请求头及 JSON、表单、文本或空请求体均可任意填写，不做业务校验。URL 路径和方法精确匹配，查询参数不影响匹配。
 
-固定响应：HTTP 200，Content-Type 为 application/json; charset=utf-8。
+自定义响应：HTTP 200，Content-Type 为 application/json; charset=utf-8。
 
-```json
+```text
 {
   "code": 0,
   "message": "ok",
@@ -29,7 +31,7 @@ ANY http://127.0.0.1:8766/test
 调用示例（macOS / Linux shell；Windows 可使用 Git Bash 或 WSL）：
 
 ```bash
-curl -X POST --url 'http://127.0.0.1:8766/test' -H 'Content-Type: application/json' --data '{"example":"任意值","count":1}'
+curl -X POST --url 'http://127.0.0.1:8766/test' -H 'Content-Type: application/json' --data-binary '{"example":"任意值","count":1}'
 ```
 
 ## 请求日志与边界

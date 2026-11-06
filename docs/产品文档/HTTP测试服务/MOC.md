@@ -10,7 +10,7 @@
 
 ## 关联信息
 
-- 用户需求：桌面内配置端口、URL、固定返回；任意测试入参；生成 MD 使用说明；请求进入日志页面。
+- 用户需求：桌面内配置端口、URL、每个接口的自定义响应体和 Content-Type，默认保留原有 JSON 示例且可完整替换；任意测试入参；一键及快捷键生成 cURL；生成 MD 使用说明；请求进入日志页面。
 - 模块：`http_test_server`。
 - 代码：`src-tauri/src/http_test_server/`、`src/views/HttpTestServer.vue`、`src/views/HttpTestLogs.vue`、`src/utils/httpTestServer.ts`。
 - OpenSpec：[提案](../../../openspec/changes/add-http-test-server/proposal.md)、[设计](../../../openspec/changes/add-http-test-server/design.md)、[规格](../../../openspec/changes/add-http-test-server/specs/http-test-server/spec.md)、[任务](../../../openspec/changes/add-http-test-server/tasks.md)。
@@ -18,4 +18,5 @@
 
 ## 变更日志
 
+- 2026-11-06 支持任意响应原文与空内容、自定义响应类型并兼容旧配置；新增接口 cURL 生成、复制和 ⌘ / Ctrl + Alt + C 快捷键，调整控件与文档预览样式；验证记录见发布说明。
 - 2026-11-03 实现测试服务、会话请求日志和文档导出，登记契约、示例及验证结果。

@@ -87,19 +87,22 @@ async fn receive(
             ),
         };
 
-    let (status, mut response_body) = if let Some((status, message)) = body_error {
-        (status, message.to_owned())
+    let default_content_type = "application/json; charset=utf-8";
+    let (status, mut response_body, content_type) = if let Some((status, message)) = body_error {
+        (status, message.to_owned(), default_content_type)
     } else if parts.method == Method::OPTIONS {
-        (StatusCode::NO_CONTENT, String::new())
+        (StatusCode::NO_CONTENT, String::new(), default_content_type)
     } else if let Some(endpoint) = endpoint {
         (
             StatusCode::from_u16(endpoint.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
             endpoint.response_body.clone(),
+            endpoint.content_type.as_str(),
         )
     } else {
         (
             StatusCode::NOT_FOUND,
             r#"{"error":"未配置该路径或请求方法"}"#.into(),
+            default_content_type,
         )
     };
     if parts.method == Method::HEAD
@@ -133,7 +136,7 @@ async fn receive(
     }
     let mut response = (
         status,
-        [(header::CONTENT_TYPE, "application/json; charset=utf-8")],
+        [(header::CONTENT_TYPE, content_type)],
         response_body,
     )
         .into_response();

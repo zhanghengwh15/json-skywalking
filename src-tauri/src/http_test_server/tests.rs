@@ -101,12 +101,14 @@ async fn handles_missing_paths_methods_preflight_head_and_bodyless_statuses() {
         path: "/any".into(),
         status_code: 200,
         response_body: "{}".into(),
+        content_type: default_content_type(),
     });
     fixture.config.endpoints.push(Endpoint {
         method: "GET".into(),
         path: "/empty".into(),
         status_code: 204,
         response_body: "{}".into(),
+        content_type: default_content_type(),
     });
     fixture.server.start(fixture.config.clone()).await.unwrap();
     assert!(fixture
@@ -229,8 +231,100 @@ fn rejects_invalid_or_conflicting_configuration() {
     config.endpoints[0].method = "GET".into();
     assert!(config.validate().is_ok());
     config.endpoints[0].response_body = "invalid".into();
+    assert!(config.validate().is_ok());
+    for content_type in ["", "   ", "text/plain\r\nX-Test: injected", "text/中文"] {
+        config.endpoints[0].content_type = content_type.into();
+        assert!(config.validate().is_err());
+    }
+    config.endpoints[0].content_type = "x".repeat(257);
+    assert!(config.validate().is_err());
+    config.endpoints[0].content_type = default_content_type();
+    config.endpoints[0].response_body = "中".repeat(MAX_LOG_BODY / 3 + 1);
     assert!(config.validate().is_err());
     config.endpoints[0].response_body = "{}".into();
     config.endpoints[0].status_code = 100;
     assert!(config.validate().is_err());
+}
+
+#[tokio::test]
+async fn custom_responses_are_independent_verbatim_and_persisted() {
+    let mut fixture = Fixture::new().await;
+    let cases = [
+        (
+            "/json",
+            "application/json; charset=utf-8",
+            "[1, true, null]",
+        ),
+        ("/text", "text/plain; charset=utf-8", "  自定义\nnot JSON\n"),
+        ("/html", "text/html; charset=utf-8", "<h1>Hello</h1>"),
+        ("/xml", "application/xml", "<result>ok</result>"),
+        ("/empty", "text/plain", ""),
+        ("/raw", "application/json", "{deliberately invalid}"),
+    ];
+    fixture.config.endpoints = cases
+        .iter()
+        .map(|(path, content_type, body)| Endpoint {
+            method: "ANY".into(),
+            path: (*path).into(),
+            status_code: 200,
+            response_body: (*body).into(),
+            content_type: (*content_type).into(),
+        })
+        .collect();
+    fixture.server.start(fixture.config.clone()).await.unwrap();
+    for (path, content_type, body) in cases {
+        let response = fixture.request("POST", path, b"arbitrary input", "").await;
+        let (headers, received) = response.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 200"));
+        assert!(headers.contains(&format!("content-type: {content_type}")));
+        assert_eq!(received, body);
+        assert_eq!(
+            fixture.server.logs.lock().unwrap().entries[0].response_body,
+            body
+        );
+    }
+    let missing = fixture.request("GET", "/missing", b"", "").await;
+    assert!(missing.starts_with("HTTP/1.1 404"));
+    assert!(missing.contains("content-type: application/json; charset=utf-8"));
+    fixture.server.stop().await.unwrap();
+    let reloaded = TestServer::new(fixture.directory.join("config.json"));
+    let status = reloaded.status().await;
+    assert!(!status.running);
+    assert_eq!(status.config.endpoints[1].response_body, cases[1].2);
+    assert_eq!(status.config.endpoints[1].content_type, cases[1].1);
+    reloaded.start(status.config).await.unwrap();
+    let response = fixture.request("GET", "/text", b"", "").await;
+    assert_eq!(response.split_once("\r\n\r\n").unwrap().1, cases[1].2);
+    reloaded.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn legacy_configuration_keeps_default_json_response() {
+    let fixture = Fixture::new().await;
+    let mut legacy = serde_json::to_value(&fixture.config).unwrap();
+    legacy["endpoints"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("contentType");
+    std::fs::write(
+        fixture.directory.join("config.json"),
+        serde_json::to_vec(&legacy).unwrap(),
+    )
+    .unwrap();
+    let reloaded = TestServer::new(fixture.directory.join("config.json"));
+    let status = reloaded.status().await;
+    assert!(status.last_error.is_none());
+    assert_eq!(
+        status.config.endpoints[0].content_type,
+        default_content_type()
+    );
+    assert_eq!(
+        status.config.endpoints[0].response_body,
+        fixture.config.endpoints[0].response_body
+    );
+    reloaded.start(status.config).await.unwrap();
+    let response = fixture.request("POST", "/test", b"", "").await;
+    assert!(response.contains("content-type: application/json; charset=utf-8"));
+    assert!(response.ends_with(&fixture.config.endpoints[0].response_body));
+    reloaded.stop().await.unwrap();
 }
