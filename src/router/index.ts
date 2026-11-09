@@ -32,6 +32,11 @@ const routes = [
     component: () => import('../views/CurlFormatter.vue')
   },
   {
+    path: '/basic-auth',
+    name: 'BasicAuth',
+    component: () => import('../views/BasicAuth.vue')
+  },
+  {
     path: '/cookie-bridge',
     name: 'CookieBridge',
     component: () => import('../views/CookieBridge.vue')

@@ -24,7 +24,7 @@ related-code:
 
 2026-11-06 增量：每个接口可完整修改响应体和 Content-Type，默认仍为原有 JSON 示例；允许 JSON、文本、HTML、XML 和空内容，最多 64 KiB，原文返回。新增接口 cURL 生成、预览、复制和页面快捷键 `⌘ / Ctrl + Alt + C`，统一方法下拉框、操作按钮和 MD 折叠入口样式。
 
-沿用 npm 和 Cargo 锁文件。版本字段未修改：package.json 为 0.1.0，Cargo.toml 为 1.0.0；Tauri 配置没有单独覆盖版本。本次未构建或发布安装包。
+沿用 npm 和 Cargo 锁文件。版本字段未修改：package.json 为 0.1.0，Cargo.toml 为 1.0.0；Tauri 配置没有单独覆盖版本。2026-11-03 初次交付未构建安装包；2026-11-06 已执行 `npm run tauri build`，生成 macOS Apple Silicon 安装包 `src-tauri/target/release/bundle/dmg/dev-tools_1.0.0_aarch64.dmg`，未执行安装或对外发布。
 
 开发启动：仓库根目录运行 `npm run tauri dev`。发布构建：`npm run tauri build`。macOS / Windows 安装步骤沿用 [CLI 安装与 PATH 说明](../../../dev-tools-cli-安装与PATH.md)，本次没有新安装钩子、PATH 或命令行行为。GUI / 控制台的既有 stdout 差异保持原样。
 
@@ -81,7 +81,8 @@ Rust 测试覆盖任意 JSON / 表单 / 文本 / 空请求体、固定响应、�
 | `cargo check --locked` 与 `cargo test --locked`，在 src-tauri 执行 | 通过，7 项 Rust 测试 | 临时配置与真实本机 TCP；多接口独立正文、文本空白换行、JSON / 文本 / HTML / XML / 空正文、非 JSON 原文、类型、保存重载后实际返回、旧配置缺省兼容、非法头 / 超长正文，以及原有生命周期、请求限制和日志回归 |
 | `openspec validate add-http-test-server --strict` | 通过 | 增量规格与任务格式 |
 | ego-browser 页面交互 | 通过 | 非 JSON 响应编辑、指定第二个接口的快捷键生成 HEAD cURL、命令实际复制成功、模拟剪贴板失败时提示手动复制、Enter / Space 展开折叠、页面样式截图检查；多接口下文档卡片保持可见，折叠区不再被压缩 |
-| Tauri 原生界面、Windows 与安装包 | 未执行 | 本轮未做原生窗口启停、系统下载目录导出或 Windows 实机验证，未构建发布安装包 |
+| `npm run tauri build` | 通过 | 已完成前端构建、Rust release 编译及 macOS Apple Silicon DMG 打包，版本 1.0.0；`hdiutil verify` 镜像完整性检查通过 |
+| Tauri 原生界面、Windows 与安装验收 | 未执行 | 本轮未做原生窗口启停、系统下载目录导出、安装或 Windows 实机验证，未对外发布 |
 
 Cargo 仍显示既有 `unused manifest key: build` 警告，不影响本次检查和测试通过。
 

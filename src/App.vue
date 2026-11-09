@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { path: '/http-test-server', name: '测试服务', icon: 'sensors' },
   { path: '/http-test-logs', name: '请求日志', icon: 'receipt_long' },
   { path: '/curl-formatter', name: 'cURL格式化', icon: 'terminal' },
+  { path: '/basic-auth', name: 'Basic认证', icon: 'vpn_key' },
   { path: '/cookie-bridge', name: 'Cookie信息', icon: 'cookie' },
   { path: '/task-branch-group', name: '任务分支', icon: 'account_tree' },
   { path: '/timestamp-converter', name: '时间戳转换', icon: 'schedule' },
