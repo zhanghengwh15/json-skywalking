@@ -76,7 +76,11 @@ function toggleSidebar() {
 
       <!-- Page Content -->
       <div class="page-content">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive include="BasicAuth">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </div>
     </main>
   </div>

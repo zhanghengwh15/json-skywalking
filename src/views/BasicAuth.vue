@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onDeactivated, ref, watch } from 'vue'
+
+defineOptions({ name: 'BasicAuth' })
 
 const username = ref('')
 const password = ref('')
@@ -18,6 +20,10 @@ const encoded = computed(() => {
 const authorization = computed(() => encoded.value ? `Basic ${encoded.value}` : '')
 
 watch([username, password], () => { feedback.value = '' })
+onDeactivated(() => {
+  showPassword.value = false
+  feedback.value = ''
+})
 
 async function copy(value: string) {
   try {
