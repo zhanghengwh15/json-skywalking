@@ -33,12 +33,13 @@
           </div>
           <div v-else-if="filteredJson" class="json-tree">
             <JsonTreeNode 
-              :data="filteredJson" 
+              :data="filteredJson.data"
               :key-name="'root'" 
               :is-root="true"
               :level="0"
               :selected-path="selectedKeyPath"
               :current-path="[]"
+              :array-indexes="filteredJson.arrayIndexes"
               @select="onSelectKey"
               @contextmenu="onContextMenu"
             />
@@ -210,11 +211,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, defineComponent, h, watch, type PropType } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { parseJsonWithComments, isValidJson } from '../utils/jsonUtils'
 import '../assets/styles/JsonParser.css'
+
+type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
+type JsonPath = (string | number)[]
+type ArrayIndexes = WeakMap<readonly unknown[], number[]>
 
 // 递归查找value
 function getValueByPath(obj: any, path: (string|number)[]): any {
@@ -240,7 +245,8 @@ const JsonTreeNode = defineComponent({
     isRoot: { type: Boolean, default: false },
     level: { type: Number, default: 0 },
     selectedPath: { type: Array, default: () => [] },
-    currentPath: { type: Array, default: () => [] }
+    currentPath: { type: Array as PropType<JsonPath>, default: () => [] },
+    arrayIndexes: { type: WeakMap as PropType<ArrayIndexes> }
   },
   emits: ['select', 'contextmenu'],
   setup(props, { emit }) {
@@ -302,7 +308,6 @@ const JsonTreeNode = defineComponent({
       emit('contextmenu', {
         event: e,
         key: props.keyName,
-        value: props.data,
         path: props.currentPath.slice()
       })
     }
@@ -361,15 +366,18 @@ const JsonTreeNode = defineComponent({
         const childNodes: any[] = []
         
         if (Array.isArray(data)) {
+          const originalIndexes = props.arrayIndexes?.get(data)
           data.forEach((item, index) => {
+            const originalIndex = originalIndexes?.[index] ?? index
             childNodes.push(
               h(JsonTreeNode, {
-                key: index,
+                key: originalIndex,
                 data: item,
-                keyName: `[${index}]`,
+                keyName: `[${originalIndex}]`,
                 level: level + 1,
                 selectedPath,
-                currentPath: [...currentPath, index],
+                currentPath: [...currentPath, originalIndex],
+                arrayIndexes: props.arrayIndexes,
                 onSelect: emit.bind(null, 'select'),
                 onContextmenu: emit.bind(null, 'contextmenu')
               })
@@ -385,6 +393,7 @@ const JsonTreeNode = defineComponent({
                 level: level + 1,
                 selectedPath,
                 currentPath: [...currentPath, key],
+                arrayIndexes: props.arrayIndexes,
                 onSelect: emit.bind(null, 'select'),
                 onContextmenu: emit.bind(null, 'contextmenu')
               })
@@ -512,12 +521,12 @@ function onSelectKey(path: (string|number)[]) {
 }
 
 // 处理右键菜单
-function onContextMenu(event: { event: MouseEvent, key: string, value: any, path: (string|number)[] }) {
+function onContextMenu(event: { event: MouseEvent, key: string, path: JsonPath }) {
   showContextMenu.value = true
   contextMenuPosition.value = { x: event.event.clientX, y: event.event.clientY }
   contextMenuData.value = { 
     key: event.key, 
-    value: event.value, 
+    value: getValueByPath(parsedJson.value, event.path),
     path: event.path 
   }
 }
@@ -1442,78 +1451,48 @@ function updateJsonValue(path: (string|number)[], newValue: any) {
 
 const searchText = ref('')
 
-// 递归过滤JSON，返回只包含匹配key或value的树
-function filterJsonTree(data: any, keyword: string): any {
-  if (!keyword) return data
-  if (data === null || data === undefined) return null
-  const kw = keyword.toLowerCase()
-  
+// 过滤后的数组是紧凑的，另外记录每个可见节点在原数组中的下标。
+function filterJsonTree(data: JsonValue, keyword: string, arrayIndexes: ArrayIndexes): JsonValue | undefined {
   if (Array.isArray(data)) {
-    // 处理数组：保持数组结构，只显示匹配的元素
-    const filteredArr = data
-      .map((item) => {
-        const filteredItem = filterJsonTree(item, keyword)
-        return filteredItem !== null && filteredItem !== undefined ? filteredItem : null
-      })
-      .filter(item => item !== null && item !== undefined)
-    return filteredArr.length > 0 ? filteredArr : null
-  } else if (typeof data === 'object') {
-    let matched = false
-    const result: any = {}
-    
-    for (const [k, v] of Object.entries(data)) {
-      // key 匹配
-      if (k.toLowerCase().includes(kw)) {
-        result[k] = v
-        matched = true
-        continue
-      }
-      
-      // value 匹配
-      if (typeof v === 'string' && v.toLowerCase().includes(kw)) {
-        result[k] = v
-        matched = true
-        continue
-      }
-      if (typeof v === 'number' && v.toString().includes(kw)) {
-        result[k] = v
-        matched = true
-        continue
-      }
-      if (typeof v === 'boolean' && v.toString().toLowerCase().includes(kw)) {
-        result[k] = v
-        matched = true
-        continue
-      }
-      
-      // 递归子节点
-      const child = filterJsonTree(v, keyword)
-      if (child !== null && child !== undefined) {
-        // 检查子节点是否有内容
-        const hasContent = Array.isArray(child) ? child.length > 0 : 
-                          typeof child === 'object' ? Object.keys(child).length > 0 : true
-        if (hasContent) {
-          result[k] = child
-          matched = true
-        }
-      }
-    }
-    return matched ? result : null
-  } else {
-    // 基本类型直接匹配
-    if (typeof data === 'string' && data.toLowerCase().includes(kw)) return data
-    if (typeof data === 'number' && data.toString().includes(kw)) return data
-    if (typeof data === 'boolean' && data.toString().toLowerCase().includes(kw)) return data
-    return null
+    const matches: JsonValue[] = []
+    const indexes: number[] = []
+    data.forEach((item, index) => {
+      const match = filterJsonTree(item, keyword, arrayIndexes)
+      if (match === undefined) return
+      matches.push(match)
+      indexes.push(index)
+    })
+    if (!matches.length) return undefined
+    arrayIndexes.set(matches, indexes)
+    return matches
   }
+
+  if (data !== null && typeof data === 'object') {
+    const matches: [string, JsonValue][] = []
+    for (const [key, value] of Object.entries(data)) {
+      const match = key.toLowerCase().includes(keyword)
+        ? value
+        : filterJsonTree(value, keyword, arrayIndexes)
+      if (match !== undefined) matches.push([key, match])
+    }
+    return matches.length ? Object.fromEntries(matches) : undefined
+  }
+
+  return data !== null && String(data).toLowerCase().includes(keyword) ? data : undefined
 }
 
 const filteredJson = computed(() => {
-  if (!searchText.value) return parsedJson.value
-  return filterJsonTree(parsedJson.value, searchText.value)
+  const data: JsonValue = parsedJson.value
+  if (!data) return null
+  const keyword = searchText.value.toLowerCase()
+  if (!keyword) return { data }
+
+  const arrayIndexes: ArrayIndexes = new WeakMap()
+  const matches = filterJsonTree(data, keyword, arrayIndexes)
+  return matches == null ? null : { data: matches, arrayIndexes }
 })
 </script>
 
 <style scoped>
 /**** 只保留结构相关样式，布局交给全局和 assets 样式文件 ****/
-</style> 
+</style>

@@ -38,9 +38,10 @@
 }
 
 /* 主工作区两栏 */
-.content {
+.json-parser > .content {
   display: grid;
-  grid-template-columns: 5fr 7fr;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -48,10 +49,12 @@
 }
 
 /* 通用面板 */
-.input-section,
-.output-section {
+.json-parser .input-section,
+.json-parser .output-section {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -354,6 +357,7 @@
 /* 输出区 */
 .json-output {
   flex: 1;
+  min-height: 0;
   padding: 16px 20px;
   background: transparent;
   overflow: auto;
@@ -379,7 +383,8 @@
 .json-edit-textarea {
   flex: 1;
   width: 100%;
-  min-height: 120px;
+  min-height: 0;
+  overflow: auto;
   padding: 16px 20px;
   background: rgba(0,0,0,0.2);
   color: var(--text-primary);
@@ -901,9 +906,9 @@
 
 /* 响应式 */
 @media (max-width: 900px) {
-  .content {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+  .json-parser > .content {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
   }
 
   .json-parser {
