@@ -155,6 +155,11 @@
         <span>复制 Key</span>
         <span class="menu-key">{{ contextMenuData?.key }}</span>
       </div>
+      <div class="context-menu-item" @click="copyJsonPath">
+        <span class="menu-icon">🔗</span>
+        <span>复制 JSON 路径</span>
+        <span class="menu-preview">{{ getJsonPathPreview(contextMenuData?.path) }}</span>
+      </div>
       <div class="context-menu-item" @click="copyValue">
         <span class="menu-icon">📄</span>
         <span>复制 Value</span>
@@ -234,6 +239,24 @@ function getValuePreview(value: any): string {
   if (typeof value === 'object') return `Object(${Object.keys(value).length})`
   if (typeof value === 'string') return value.length > 20 ? value.slice(0, 20) + '...' : value
   return String(value)
+}
+
+// 生成标准 JSONPath，根节点为 $，数组元素使用下标访问
+function getJsonPath(path: JsonPath = []): string {
+  return path.reduce<string>((jsonPath, segment) => {
+    if (typeof segment === 'number') return `${jsonPath}[${segment}]`
+
+    // 常规标识符使用点号访问，其他键名使用 JSONPath 的括号字符串访问
+    if (/^[A-Za-z_$][\w$]*$/.test(segment)) {
+      return `${jsonPath}.${segment}`
+    }
+    return `${jsonPath}[${JSON.stringify(segment)}]`
+  }, '$')
+}
+
+function getJsonPathPreview(path: JsonPath | undefined): string {
+  const jsonPath = getJsonPath(path ?? [])
+  return jsonPath.length > 28 ? `${jsonPath.slice(0, 28)}...` : jsonPath
 }
 
 // JSON树节点组件
@@ -543,6 +566,18 @@ async function copyKey() {
   try {
     await navigator.clipboard.writeText(contextMenuData.value.key)
     showClipboardStatus('success', '键名已复制到剪贴板！')
+  } catch (err) {
+    showClipboardStatus('error', '复制失败')
+  }
+  closeContextMenu()
+}
+
+// 复制 JSON 路径
+async function copyJsonPath() {
+  if (!contextMenuData.value) return
+  try {
+    await navigator.clipboard.writeText(getJsonPath(contextMenuData.value.path))
+    showClipboardStatus('success', 'JSON 路径已复制到剪贴板！')
   } catch (err) {
     showClipboardStatus('error', '复制失败')
   }
